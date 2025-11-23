@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HelpScout Ticket Insights</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .insight-item {
+            padding: 12px;
+            border-left: 4px solid #3498db;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .insight-text {
+            font-weight: 500;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .insight-meta {
+            font-size: 13px;
+            color: #7f8c8d;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2980b9);
+            transition: width 0.3s ease;
+        }
+
+        .sentiment-badges {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .badge-positive {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-neutral {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-negative {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        select, input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 15px;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>HelpScout Ticket Insights</h1>
+            <p class="subtitle">LLM-powered support ticket analysis</p>
+        </header>
+
+        <div class="actions">
+            <button onclick="loadInsights()">Refresh Insights</button>
+            <button onclick="triggerSync()">Sync Tickets</button>
+            <button onclick="triggerAnalysis()">Analyze Tickets</button>
+        </div>
+
+        <div class="filters">
+            <select id="daysFilter" onchange="loadInsights()">
+                <option value="7">Last 7 days</option>
+                <option value="14">Last 14 days</option>
+                <option value="30">Last 30 days</option>
+            </select>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Tickets Analyzed</div>
+                <div class="stat-value" id="totalTickets">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Urgency</div>
+                <div class="stat-value" id="avgUrgency">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Top Pain Points</div>
+                <div class="stat-value" id="painPointCount">-</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Top Pain Points</h2>
+            <div id="painPoints">
+                <div class="loading">Loading insights...</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Top Topics</h2>
+            <div id="topics">
+                <div class="loading">Loading topics...</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Sentiment Distribution</h2>
+            <div id="sentiments">
+                <div class="loading">Loading sentiments...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+
+        async function loadInsights() {
+            const days = document.getElementById('daysFilter').value;
+            showError(null);
+
+            try {
+                const response = await fetch(`/api/insights?days=${days}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                currentData = await response.json();
+                renderInsights(currentData);
+            } catch (error) {
+                console.error('Error loading insights:', error);
+                showError(`Failed to load insights: ${error.message}`);
+            }
+        }
+
+        function renderInsights(data) {
+            // Update stats
+            document.getElementById('totalTickets').textContent = data.total_tickets_analyzed || 0;
+            document.getElementById('avgUrgency').textContent =
+                data.average_urgency ? data.average_urgency.toFixed(2) : '0.00';
+            document.getElementById('painPointCount').textContent = data.top_pain_points?.length || 0;
+
+            // Render pain points
+            const painPointsEl = document.getElementById('painPoints');
+            if (data.top_pain_points && data.top_pain_points.length > 0) {
+                painPointsEl.innerHTML = data.top_pain_points.map(pp => `
+                    <div class="insight-item">
+                        <div class="insight-text">${escapeHtml(pp.pain_point)}</div>
+                        <div class="insight-meta">
+                            ${pp.count} occurrences (${pp.percentage.toFixed(1)}%)
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${pp.percentage}%"></div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                painPointsEl.innerHTML = '<div class="empty-state">No pain points found</div>';
+            }
+
+            // Render topics
+            const topicsEl = document.getElementById('topics');
+            if (data.top_topics && data.top_topics.length > 0) {
+                topicsEl.innerHTML = data.top_topics.map(topic => `
+                    <div class="insight-item">
+                        <div class="insight-text">${escapeHtml(topic.topic)}</div>
+                        <div class="insight-meta">
+                            ${topic.count} tickets (${topic.percentage.toFixed(1)}%)
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${topic.percentage}%"></div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                topicsEl.innerHTML = '<div class="empty-state">No topics found</div>';
+            }
+
+            // Render sentiments
+            const sentimentsEl = document.getElementById('sentiments');
+            if (data.sentiment_distribution) {
+                const total = Object.values(data.sentiment_distribution).reduce((a, b) => a + b, 0);
+                sentimentsEl.innerHTML = `
+                    <div class="sentiment-badges">
+                        ${Object.entries(data.sentiment_distribution).map(([sentiment, count]) => {
+                            const percentage = total > 0 ? (count / total * 100).toFixed(1) : 0;
+                            const badgeClass = `badge-${sentiment}`;
+                            return `<span class="badge ${badgeClass}">${sentiment}: ${count} (${percentage}%)</span>`;
+                        }).join('')}
+                    </div>
+                `;
+            } else {
+                sentimentsEl.innerHTML = '<div class="empty-state">No sentiment data</div>';
+            }
+        }
+
+        async function triggerSync() {
+            showError(null);
+            try {
+                const response = await fetch('/api/sync', { method: 'POST' });
+                if (!response.ok) throw new Error('Sync request failed');
+                alert('Sync started successfully! Refresh in a few minutes.');
+            } catch (error) {
+                showError(`Failed to trigger sync: ${error.message}`);
+            }
+        }
+
+        async function triggerAnalysis() {
+            showError(null);
+            try {
+                const response = await fetch('/api/analyze', { method: 'POST' });
+                if (!response.ok) throw new Error('Analysis request failed');
+                alert('Analysis started successfully! Refresh in a few minutes.');
+            } catch (error) {
+                showError(`Failed to trigger analysis: ${error.message}`);
+            }
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error');
+            if (message) {
+                errorEl.textContent = message;
+                errorEl.style.display = 'block';
+            } else {
+                errorEl.style.display = 'none';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load insights on page load
+        window.addEventListener('DOMContentLoaded', loadInsights);
+    </script>
+</body>
+</html>
