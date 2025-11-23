@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # OpenAI Configuration
     openai_api_key: Optional[str] = None
-    openai_model: str = "gpt-4o"  # Latest model (gpt-4o, gpt-4o-mini)
+    openai_model: str = "gpt-5.1"  # Latest model (gpt-5.1, gpt-5.1-instant)
 
     # Application Settings
     log_level: str = "INFO"

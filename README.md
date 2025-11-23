@@ -19,7 +19,7 @@ Everything else has been removed to keep it **simple, fast, and reliable**.
 - ⚡ **Zero-friction onboarding** - clone, configure .env, docker compose up
 - 🛡️ **Failure-proof** - comprehensive error handling with actionable messages
 - 🔍 **Preflight validation** - checks all prerequisites before startup
-- 🤖 **Smart categorization** - GPT-4 extracts category, subcategory, pain points, sentiment
+- 🤖 **Smart categorization** - GPT-5.1 with adaptive reasoning for category, subcategory, pain points, sentiment
 - 📊 **Statistical insights** - distribution, trending, cross-analysis on LLM data
 - 🔄 **Fault-tolerant sync** - duplicate detection, batch commits, auto-retry
 - 🏥 **Health checks** - monitoring endpoint for production deployments
@@ -66,7 +66,7 @@ docker compose up -d
 1. ✅ Run preflight validation (checks API keys, database, connectivity)
 2. ✅ Initialize database schema
 3. ✅ Sync your HelpScout tickets (from `SYNC_START_DATE` if set)
-4. ✅ Categorize tickets with GPT-4 (category, subcategory, sentiment, urgency)
+4. ✅ Categorize tickets with GPT-5.1 (category, subcategory, sentiment, urgency)
 5. ✅ Generate statistical insights (distribution, trends, cross-analysis)
 6. ✅ Start the API server
 
@@ -271,7 +271,7 @@ This creates 10 mock tickets, runs analysis, and verifies:
 | `HELPSCOUT_API_KEY` | ✅ Yes | - | HelpScout API key |
 | `OPENAI_API_KEY` | ✅ Yes | - | OpenAI API key (must start with `sk-`) |
 | `DATABASE_URL` | No | `postgresql://...` | PostgreSQL connection string |
-| `OPENAI_MODEL` | No | `gpt-4o` | OpenAI model to use (gpt-4o or gpt-4o-mini) |
+| `OPENAI_MODEL` | No | `gpt-5.1` | OpenAI model to use (gpt-5.1 or gpt-5.1-instant) |
 | `LOG_LEVEL` | No | `INFO` | Logging level |
 | **Sync Configuration** ||||
 | `SYNC_START_DATE` | No | - | Only sync tickets from this date (ISO: `2024-01-01`) |
@@ -289,8 +289,8 @@ This creates 10 mock tickets, runs analysis, and verifies:
 SYNC_START_DATE=2024-11-01
 MAX_TICKETS_PER_SYNC=100
 
-# Use cheaper model for testing
-OPENAI_MODEL=gpt-3.5-turbo
+# Use faster instant model
+OPENAI_MODEL=gpt-5.1-instant
 ```
 
 **For production with comprehensive analysis:**
@@ -300,8 +300,8 @@ OPENAI_MODEL=gpt-3.5-turbo
 SYNC_START_DATE=
 MAX_TICKETS_PER_SYNC=0  # unlimited
 
-# Use best model
-OPENAI_MODEL=gpt-4-turbo-preview
+# Use best model (adaptive reasoning)
+OPENAI_MODEL=gpt-5.1
 ANALYSIS_BATCH_SIZE=50
 ```
 
