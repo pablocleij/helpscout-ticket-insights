@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format clean docker-build docker-up docker-down init sync
+.PHONY: help install dev test test-mock lint format clean docker-build docker-up docker-down init sync
 
 help:
 	@echo "HelpScout Ticket Insights - Available Commands"
@@ -7,6 +7,7 @@ help:
 	@echo "  make install      Install dependencies"
 	@echo "  make dev          Run development server"
 	@echo "  make test         Run tests"
+	@echo "  make test-mock    Run test with mock data (verify everything works!)"
 	@echo "  make lint         Run linters"
 	@echo "  make format       Format code"
 	@echo ""
@@ -28,6 +29,10 @@ dev:
 
 test:
 	pytest tests/ -v --cov=src --cov-report=term-missing
+
+test-mock:
+	@echo "🧪 Running end-to-end test with mock data..."
+	@python scripts/test_with_mock_data.py
 
 lint:
 	flake8 src tests --max-line-length=100 --extend-ignore=E203,W503

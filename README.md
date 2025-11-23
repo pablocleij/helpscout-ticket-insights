@@ -227,6 +227,24 @@ python -m src.workers.worker
 
 ### Running Tests
 
+**Quick verification (recommended first!):**
+```bash
+# Test entire system with mock data - no API keys needed!
+make test-mock
+
+# Or directly:
+python scripts/test_with_mock_data.py
+```
+
+This will:
+- ✅ Create 10 mock tickets in the database
+- ✅ Generate mock LLM analysis (category, subcategory, pain points, etc.)
+- ✅ Run statistical analysis
+- ✅ Verify sync integrity (no duplicates)
+- ✅ Test category breakdown
+- ✅ Display results
+
+**Unit tests:**
 ```bash
 # Run all tests
 pytest tests/ -v
@@ -236,6 +254,7 @@ pytest tests/ --cov=src --cov-report=html
 
 # Run specific test file
 pytest tests/test_api.py -v
+pytest tests/test_stats_analyzer.py -v
 ```
 
 ### Code Quality

@@ -48,6 +48,8 @@ def test_analyze_ticket(mock_get_provider, db_session, sample_ticket):
     # Mock LLM provider
     mock_provider = Mock()
     mock_provider.analyze_ticket.return_value = {
+        "category": "Billing",
+        "subcategory": "Payment Issue",
         "pain_points": ["slow billing", "confusing invoice"],
         "topics": ["billing", "payments"],
         "sentiment": "negative",
@@ -65,6 +67,8 @@ def test_analyze_ticket(mock_get_provider, db_session, sample_ticket):
     # Verify analysis was created
     assert analysis is not None
     assert analysis.ticket_id == sample_ticket.id
+    assert analysis.category == "Billing"
+    assert analysis.subcategory == "Payment Issue"
     assert "slow billing" in analysis.pain_points
     assert analysis.sentiment == "negative"
     assert analysis.urgency_score == 0.7
@@ -93,6 +97,8 @@ def test_analyze_pending_tickets(mock_get_provider, db_session):
     # Mock LLM provider
     mock_provider = Mock()
     mock_provider.analyze_ticket.return_value = {
+        "category": "General",
+        "subcategory": "Question",
         "pain_points": ["test"],
         "topics": ["test"],
         "sentiment": "neutral",
@@ -133,6 +139,8 @@ def test_aggregate_insights(db_session):
 
         analysis = TicketAnalysis(
             ticket_id=ticket.id,
+            category="Billing" if i < 3 else "Technical Issue",
+            subcategory="Payment Issue" if i < 3 else "Bug",
             pain_points=["slow response", "confusing UI"] if i % 2 == 0 else ["slow response"],
             topics=["billing"],
             sentiment="negative" if i < 2 else "neutral",
