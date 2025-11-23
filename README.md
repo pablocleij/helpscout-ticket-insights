@@ -1,128 +1,93 @@
 # HelpScout Ticket Insights
 
-> **Open-source tool** that syncs HelpScout tickets, stores them locally, and runs periodic LLM analyses to surface top pain-points, trends, and actionable insights.
+> **Lightweight, bulletproof tool** that syncs HelpScout tickets, categorizes them with LLM, and surfaces actionable insights through statistical analysis.
 
-[![CI](https://github.com/yourusername/helpscout-ticket-insights/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/helpscout-ticket-insights/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## 🎯 Goals
+## 🎯 Core Philosophy
 
-- **Zero-friction onboarding**: Clone → fill `.env` → `docker compose up` → done
-- **Incremental sync**: Webhook + polling fallback for real-time updates
-- **LLM-powered insights**: Automatically identify pain points, topics, sentiment, and urgency
-- **Simple UI**: Clean web interface to view aggregated insights
-- **Pluggable LLM providers**: OpenAI by default, easy to add Anthropic or others
-- **Light footprint**: Postgres + Redis, runs on a single server
+**Three pillars that work flawlessly:**
+
+1. **Sync tickets** from HelpScout without any faults or duplicates
+2. **LLM categorization** with hierarchical category → subcategory structure
+3. **Statistical analysis** on LLM-labeled data for trends and insights
+
+Everything else has been removed to keep it **simple, fast, and reliable**.
 
 ## ✨ Features
 
-- ⚡ **Zero-config startup** - automatic database setup, migrations, and first sync
-- 🔄 **Smart sync** - incremental updates with configurable date range
-- 🤖 **Dual analysis** - LLM + statistical categorization for comprehensive insights
-- 📊 **Auto-categorization** - automatically detects categories, subcategories, and patterns
-- 📈 **Time-based filtering** - analyze tickets from specific date ranges
-- 🔔 **Webhook support** for real-time ticket processing
-- 🏷️ **Smart tagging** suggestions from LLM
-- 🌐 **REST API** for integrations
-- 🐳 **Docker-first** - single command deployment
+- ⚡ **Zero-friction onboarding** - clone, configure .env, docker compose up
+- 🛡️ **Failure-proof** - comprehensive error handling with actionable messages
+- 🔍 **Preflight validation** - checks all prerequisites before startup
+- 🤖 **Smart categorization** - GPT-4 extracts category, subcategory, pain points, sentiment
+- 📊 **Statistical insights** - distribution, trending, cross-analysis on LLM data
+- 🔄 **Fault-tolerant sync** - duplicate detection, batch commits, auto-retry
+- 🏥 **Health checks** - monitoring endpoint for production deployments
+- 🐳 **Docker-first** - single command deployment with PostgreSQL
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - Docker & Docker Compose
-- HelpScout account with API access
-- OpenAI API key (or Anthropic for Claude)
+- HelpScout API key ([get one here](https://secure.helpscout.net/apps/custom/))
+- OpenAI API key ([get one here](https://platform.openai.com/api-keys))
 
 ### Installation
 
-1. **Clone the repository**
+**1. Clone and configure**
 
 ```bash
 git clone https://github.com/yourusername/helpscout-ticket-insights.git
 cd helpscout-ticket-insights
-```
-
-2. **Configure environment**
-
-```bash
 cp .env.example .env
 ```
 
-Edit `.env` and fill in **just these two required fields**:
+**2. Edit `.env` with your API keys**
 
 ```bash
-# Required - get from HelpScout API settings
-HELPSCOUT_API_KEY=your_helpscout_api_key
+# Required
+HELPSCOUT_API_KEY=your_helpscout_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
 
-# Required - get from OpenAI
-OPENAI_API_KEY=your_openai_api_key
-
-# Optional - sync only tickets from this date onwards (saves time & LLM costs)
+# Optional - sync only recent tickets to save time & LLM costs
 SYNC_START_DATE=2024-01-01
-
-# Optional - limit initial sync (0 = unlimited)
-SYNC_INITIAL_LIMIT=1000
+MAX_TICKETS_PER_SYNC=100
 ```
 
-3. **Start everything**
+**3. Start everything**
 
 ```bash
 docker compose up -d
 ```
 
 **That's it!** 🎉 The system will automatically:
-- ✅ Wait for database to be ready
-- ✅ Run migrations
-- ✅ Sync your HelpScout tickets (from `SYNC_START_DATE` if set)
-- ✅ Analyze tickets with LLM
-- ✅ Generate statistical categories
-- ✅ Aggregate insights
-- ✅ Start the web UI
 
-4. **Access the dashboard**
+1. ✅ Run preflight validation (checks API keys, database, connectivity)
+2. ✅ Initialize database schema
+3. ✅ Sync your HelpScout tickets (from `SYNC_START_DATE` if set)
+4. ✅ Categorize tickets with GPT-4 (category, subcategory, sentiment, urgency)
+5. ✅ Generate statistical insights (distribution, trends, cross-analysis)
+6. ✅ Start the API server
 
-Open http://localhost:8000 in your browser (wait 2-3 minutes for first sync to complete)
+**Watch it work:**
 
-**View logs:**
 ```bash
 docker compose logs -f api
 ```
 
-## 📋 Usage
+You'll see preflight checks, sync progress, and LLM categorization in real-time.
 
-### View Insights
+**Access the dashboard:**
 
-Visit http://localhost:8000 to see:
-- **LLM-extracted insights**: Top pain points, topics, sentiment, urgency
-- **Auto-detected categories**: Statistical analysis finds patterns automatically
-- **Frequent tags**: Most common HelpScout tags
-- **Time-based trends**: Analyze specific date ranges
-- **Recent tickets**: Browse and search your synced tickets
+- API docs: http://localhost:8000/docs
+- Health check: http://localhost:8000/api/health
 
-### Automatic Categorization
-
-The system uses **dual analysis** for comprehensive insights:
-
-1. **LLM Analysis** (OpenAI/Anthropic):
-   - Identifies specific pain points
-   - Extracts topics and themes
-   - Determines sentiment and urgency
-   - Suggests relevant tags
-
-2. **Statistical Analysis** (No LLM needed):
-   - Automatically detects main categories from keywords
-   - Clusters similar tickets by tags
-   - Finds common subject line patterns
-   - Builds hierarchical category structure
-
-This approach gives you **instant insights** without waiting for LLM analysis on every ticket, while still providing deep analysis where it matters.
-
-### API Endpoints
+## 📋 API Endpoints
 
 ```bash
-# Get aggregated insights
-GET /api/insights?days=7
+# Health check
+GET /api/health
 
 # List recent tickets with analysis
 GET /api/tickets?days=7&limit=50
@@ -130,44 +95,20 @@ GET /api/tickets?days=7&limit=50
 # Get single ticket details
 GET /api/tickets/{ticket_id}
 
+# Get statistical analysis of categories
+GET /api/categories/stats?days=7
+
+# Get breakdown for specific category
+GET /api/categories/Billing?days=30
+
 # Trigger manual sync
 POST /api/sync
 
 # Trigger manual analysis
 POST /api/analyze
-
-# Check sync status
-GET /api/sync-status
-
-# Get auto-detected categories
-GET /api/categories?days=30
-
-# Health check
-GET /health
 ```
 
-Full API documentation: http://localhost:8000/docs
-
-### Manual Operations
-
-```bash
-# Run sync manually
-docker compose exec api python scripts/run_sync.py
-
-# Run analysis on pending tickets
-docker compose exec api python -c "from src.database import get_db_context; from src.analyzer.pipeline import AnalysisPipeline; from src.database import get_db_context; db = get_db_context(); pipeline = AnalysisPipeline(db); pipeline.analyze_pending_tickets()"
-
-# Access database
-docker compose exec postgres psql -U helpscout -d helpscout_insights
-```
-
-### Webhook Setup
-
-1. In HelpScout, go to **Manage → Apps**
-2. Create a new **Custom App**
-3. Set webhook URL to: `https://your-domain.com/webhooks/helpscout`
-4. Subscribe to events: `conversation.created`, `conversation.updated`
-5. Copy the webhook secret to your `.env` file
+Full interactive docs: http://localhost:8000/docs
 
 ## 🏗️ Architecture
 
@@ -179,32 +120,215 @@ docker compose exec postgres psql -U helpscout -d helpscout_insights
        │
        ↓
 ┌──────────────────┐      ┌─────────────┐
-│  Syncer Worker   │─────→│  Postgres   │
-│  (Incremental)   │      │  Database   │
+│   HelpScout      │─────→│  PostgreSQL │
+│   Syncer         │      │  Database   │
+│ (fault-tolerant) │      └─────────────┘
+└──────────────────┘             │
+       │                         │
+       ↓                         ↓
+┌──────────────────┐      ┌─────────────┐
+│   OpenAI GPT-4   │←─────│   Tickets   │
+│  Categorization  │      │  + Threads  │
 └──────────────────┘      └─────────────┘
        │                         │
        ↓                         ↓
 ┌──────────────────┐      ┌─────────────┐
-│  Analysis Worker │←─────│   RQ Jobs   │
-│  (LLM Pipeline)  │      │   (Redis)   │
+│   Statistical    │←─────│   Ticket    │
+│   Analyzer       │      │  Analyses   │
 └──────────────────┘      └─────────────┘
        │
        ↓
 ┌──────────────────┐
 │  FastAPI Server  │
-│   + Web UI       │
+│   + REST API     │
 └──────────────────┘
 ```
 
-### Components
+**Components:**
 
-- **Syncer**: Fetches tickets from HelpScout API (initial + incremental)
-- **Analyzer**: LLM pipeline for extracting insights
-- **Aggregator**: Computes top pain points and trends
-- **API**: FastAPI server with REST endpoints
-- **Worker**: Background job processor (RQ)
-- **Scheduler**: Periodic tasks (sync every 6h, aggregate nightly)
-- **UI**: Simple web dashboard
+- **HelpScout Syncer** - Fetches tickets with duplicate detection, batch commits, error recovery
+- **OpenAI Provider** - GPT-4 categorization with retry logic and comprehensive error handling
+- **Statistical Analyzer** - Runs on LLM-categorized data for insights
+- **FastAPI Server** - REST API with automatic error handling
+- **PostgreSQL** - Stores tickets, threads, and analysis results
+
+**What's NOT included** (kept simple):
+
+- ❌ No Redis/background workers - everything runs in API process
+- ❌ No webhooks - polling only for reliability
+- ❌ No complex UI - just API (build your own frontend!)
+- ❌ No migrations - uses SQLAlchemy create_all()
+- ❌ No multiple LLM providers - OpenAI only
+
+## 🛡️ Error Handling & Reliability
+
+### Preflight Validation
+
+Before startup, the system validates:
+
+- ✅ Environment variables are set
+- ✅ Python dependencies installed
+- ✅ Database connectivity
+- ✅ HelpScout API authentication
+- ✅ OpenAI API key and quota
+
+**If anything is wrong, you get actionable error messages:**
+
+```
+❌ FAIL - OpenAI API
+
+  ❌ OpenAI API key is invalid
+
+💡 Action required:
+   1. Verify OPENAI_API_KEY is correct in .env
+   2. Generate new key at: https://platform.openai.com/api-keys
+   3. Ensure the key starts with 'sk-'
+```
+
+**Run preflight checks manually:**
+
+```bash
+python scripts/preflight_check.py
+```
+
+### Automatic Error Recovery
+
+**HelpScout Syncer:**
+- 3 retries with backoff for transient failures
+- Per-page error handling (one bad page doesn't kill sync)
+- Batch commits every 10 tickets for performance
+- Transaction rollback on failures
+- Detailed error messages for 401, 403, 429, 500, timeout, connection errors
+
+**OpenAI Provider:**
+- 3 retries with exponential backoff (2s, 4s, 8s)
+- Auto-retry for rate limits and timeouts
+- Immediate failure for permanent errors (auth, quota)
+- 60s timeout for LLM requests
+- Clear guidance for every error type
+
+**Example error messages:**
+
+```
+HelpScout API rate limit exceeded (HTTP 429).
+💡 Info: The app will automatically retry with backoff.
+   If this persists, contact HelpScout support.
+```
+
+```
+OpenAI API quota exceeded.
+💡 Action required:
+   1. Check usage at: https://platform.openai.com/usage
+   2. Add billing/credits at: https://platform.openai.com/account/billing
+   3. Verify your payment method is valid
+```
+
+### Health Monitoring
+
+```bash
+curl http://localhost:8000/api/health
+
+{
+  "status": "healthy",
+  "database": "healthy",
+  "timestamp": "2025-11-23T19:45:00.000000"
+}
+```
+
+Use for Docker health checks, load balancers, or monitoring tools.
+
+## 🧪 Testing
+
+**Quick verification with mock data (no API keys needed):**
+
+```bash
+python scripts/test_with_mock_data.py
+```
+
+This creates 10 mock tickets, runs analysis, and verifies:
+- ✅ Sync integrity (no duplicates)
+- ✅ LLM categorization (category/subcategory structure)
+- ✅ Statistical analysis (distribution, trending)
+- ✅ Category breakdown
+
+**Output:**
+
+```
+✅ ALL TESTS COMPLETED SUCCESSFULLY!
+
+📋 SUMMARY:
+  • Categories found: 7
+  • Sentiment analysis: 7 categories
+  • No duplicates: ✅
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `HELPSCOUT_API_KEY` | ✅ Yes | - | HelpScout API key |
+| `OPENAI_API_KEY` | ✅ Yes | - | OpenAI API key (must start with `sk-`) |
+| `DATABASE_URL` | No | `postgresql://...` | PostgreSQL connection string |
+| `OPENAI_MODEL` | No | `gpt-4-turbo-preview` | OpenAI model to use |
+| `LOG_LEVEL` | No | `INFO` | Logging level |
+| **Sync Configuration** ||||
+| `SYNC_START_DATE` | No | - | Only sync tickets from this date (ISO: `2024-01-01`) |
+| `MAX_TICKETS_PER_SYNC` | No | `1000` | Max tickets per sync operation |
+| `AUTO_INITIAL_SYNC` | No | `true` | Run sync automatically on first startup |
+| `AUTO_INITIAL_ANALYSIS` | No | `true` | Run analysis automatically after sync |
+| `ANALYSIS_BATCH_SIZE` | No | `50` | Tickets to analyze per batch |
+
+### Recommended Settings
+
+**For fastest startup with minimal LLM costs:**
+
+```bash
+# Only sync recent tickets
+SYNC_START_DATE=2024-11-01
+MAX_TICKETS_PER_SYNC=100
+
+# Use cheaper model for testing
+OPENAI_MODEL=gpt-3.5-turbo
+```
+
+**For production with comprehensive analysis:**
+
+```bash
+# Sync all history
+SYNC_START_DATE=
+MAX_TICKETS_PER_SYNC=0  # unlimited
+
+# Use best model
+OPENAI_MODEL=gpt-4-turbo-preview
+ANALYSIS_BATCH_SIZE=50
+```
+
+## 📊 Data Model
+
+### Tables
+
+**tickets** - HelpScout conversations
+- `helpscout_id` (unique), `number`, `subject`, `status`, `customer_*`
+- `created_at`, `updated_at`, `closed_at`
+- `tags` (JSON), `raw_data` (JSON)
+
+**threads** - Individual messages in conversations
+- `helpscout_id` (unique), `ticket_id` (FK)
+- `type`, `body`, `body_plain`
+- `created_by_*`, `is_customer`
+
+**ticket_analyses** - LLM analysis results
+- `ticket_id` (FK)
+- `category`, `subcategory`
+- `pain_points` (JSON), `topics` (JSON)
+- `sentiment`, `urgency_score`
+- `suggested_tags` (JSON), `summary`
+- `analyzed_at`, `llm_provider`, `llm_model`
+
+**sync_states** - Track sync progress per mailbox
+- `mailbox_id`, `last_sync_at`, `total_tickets_synced`
 
 ## 🛠️ Development
 
@@ -214,176 +338,92 @@ docker compose exec postgres psql -U helpscout -d helpscout_insights
 # Install dependencies
 pip install -r requirements.txt
 
-# Set up database
+# Set environment
 export DATABASE_URL="postgresql://helpscout:helpscout@localhost:5432/helpscout_insights"
-alembic upgrade head
+export HELPSCOUT_API_KEY="your_key"
+export OPENAI_API_KEY="your_key"
+
+# Initialize database
+python scripts/init_db.py
 
 # Run API server
-uvicorn src.api.main:app --reload
-
-# Run worker
-python -m src.workers.worker
+uvicorn src.api.main:app --reload --port 8000
 ```
 
-### Running Tests
-
-**Quick verification (recommended first!):**
-```bash
-# Test entire system with mock data - no API keys needed!
-make test-mock
-
-# Or directly:
-python scripts/test_with_mock_data.py
-```
-
-This will:
-- ✅ Create 10 mock tickets in the database
-- ✅ Generate mock LLM analysis (category, subcategory, pain points, etc.)
-- ✅ Run statistical analysis
-- ✅ Verify sync integrity (no duplicates)
-- ✅ Test category breakdown
-- ✅ Display results
-
-**Unit tests:**
-```bash
-# Run all tests
-pytest tests/ -v
-
-# With coverage
-pytest tests/ --cov=src --cov-report=html
-
-# Run specific test file
-pytest tests/test_api.py -v
-pytest tests/test_stats_analyzer.py -v
-```
-
-### Code Quality
+### Manual Operations
 
 ```bash
-# Format code
-black src tests
-isort src tests
+# Run sync manually
+docker compose exec api python scripts/run_sync.py
 
-# Lint
-flake8 src tests --max-line-length=100
+# Run setup (sync + analysis)
+docker compose exec api python scripts/auto_setup.py
+
+# Access database
+docker compose exec postgres psql -U helpscout -d helpscout_insights
+
+# View logs
+docker compose logs -f api
+
+# Restart services
+docker compose restart api
 ```
 
-## 🔧 Configuration
+## 📦 Dependencies
 
-### Environment Variables
+**Core (8 packages):**
+- `fastapi` - Web framework
+- `uvicorn` - ASGI server
+- `sqlalchemy` - ORM
+- `psycopg2-binary` - PostgreSQL driver
+- `requests` - HTTP client
+- `openai` - OpenAI API
+- `pydantic` - Configuration
+- `python-dotenv` - Environment variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `HELPSCOUT_API_KEY` | Yes | - | HelpScout API key |
-| `OPENAI_API_KEY` | Yes* | - | OpenAI API key |
-| **Sync Configuration** ||||
-| `SYNC_START_DATE` | No | - | Only sync tickets from this date (ISO format: `2024-01-01`) |
-| `SYNC_INITIAL_LIMIT` | No | `0` | Max tickets on first sync (`0` = unlimited, respects `MAX_TICKETS_PER_SYNC`) |
-| `AUTO_INITIAL_SYNC` | No | `true` | Run sync automatically on first startup |
-| `AUTO_INITIAL_ANALYSIS` | No | `true` | Run analysis automatically after sync |
-| `SYNC_INTERVAL_HOURS` | No | `6` | Hours between automatic syncs |
-| `MAX_TICKETS_PER_SYNC` | No | `1000` | Max tickets per sync operation |
-| **Analysis Configuration** ||||
-| `LLM_PROVIDER` | No | `openai` | LLM provider (`openai`, `anthropic`) |
-| `ANALYSIS_BATCH_SIZE` | No | `50` | Tickets to analyze per batch |
-| `ANALYSIS_LOOKBACK_DAYS` | No | `7` | Days to include in insights |
-| `ENABLE_AUTO_CATEGORIZATION` | No | `true` | Enable statistical category extraction |
-| `CATEGORY_MIN_OCCURRENCES` | No | `2` | Min occurrences for a category |
-| `TOP_INSIGHTS_LIMIT` | No | `10` | Number of top items to show |
+**Testing:**
+- `pytest` - Test framework
+- `httpx` - HTTP client for tests
 
-*Required if using OpenAI. For Anthropic, set `ANTHROPIC_API_KEY` instead.
-
-#### Key Settings for Quick Start
-
-For the **fastest startup** with **minimal LLM costs**:
-
-```bash
-# Only sync recent tickets
-SYNC_START_DATE=2024-11-01
-
-# Limit initial sync
-SYNC_INITIAL_LIMIT=100
-
-# Enable auto-categorization (free, no LLM needed)
-ENABLE_AUTO_CATEGORIZATION=true
-```
-
-### LLM Providers
-
-**OpenAI (default)**
-
-```bash
-LLM_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4-turbo-preview
-```
-
-**Anthropic Claude**
-
-```bash
-LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-### Database Migrations
-
-```bash
-# Create new migration
-alembic revision --autogenerate -m "description"
-
-# Apply migrations
-alembic upgrade head
-
-# Rollback
-alembic downgrade -1
-```
-
-## 📊 Data Model
-
-### Key Tables
-
-- **tickets**: HelpScout conversations
-- **threads**: Individual messages in conversations
-- **ticket_analyses**: LLM analysis results
-- **aggregated_insights**: Pre-computed top pain points and topics
-- **sync_states**: Track sync progress per mailbox
+**Deployment:**
+- `docker` - Containerization
+- `docker-compose` - Orchestration
 
 ## 🤝 Contributing
 
-Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
+Contributions welcome! Please:
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Keep it simple - align with core philosophy
+4. Add tests if adding features
+5. Update README if changing behavior
+6. Submit a pull request
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- Built with [FastAPI](https://fastapi.tiangolo.com/)
-- LLM integration via [OpenAI](https://openai.com/) and [Anthropic](https://anthropic.com/)
-- HelpScout API: [docs.helpscout.com](https://developer.helpscout.com/)
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern web framework
+- [OpenAI](https://openai.com/) - LLM categorization
+- [HelpScout](https://developer.helpscout.com/) - Support ticket API
+- [SQLAlchemy](https://www.sqlalchemy.org/) - Database ORM
 
 ## 📮 Support
 
 - **Issues**: [GitHub Issues](https://github.com/yourusername/helpscout-ticket-insights/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/helpscout-ticket-insights/discussions)
+- **Questions**: Create an issue with the `question` label
 
-## 🗺️ Roadmap
+## 💡 Philosophy
 
-- [ ] Embedding-based semantic search
-- [ ] Multi-language support
-- [ ] Slack/Discord notifications for high-urgency tickets
-- [ ] Customer segmentation analysis
-- [ ] Export to CSV/JSON
-- [ ] More LLM providers (Azure OpenAI, local models)
-- [ ] Advanced visualizations (charts, trends)
-- [ ] Custom analysis prompts per mailbox
+This tool follows these principles:
 
----
+1. **Simple > Complex** - 2 services (Postgres + API) instead of 5
+2. **Reliable > Feature-rich** - Every error has actionable guidance
+3. **Direct > Async** - No background workers, just direct execution
+4. **OpenAI only** - One provider done well beats many done poorly
+5. **Test with mock data** - Verify before using real API keys
 
-**Made with ❤️ for support teams everywhere**
+**Made with ❤️ for support teams who value simplicity and reliability**
