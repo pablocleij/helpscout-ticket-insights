@@ -18,6 +18,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/health")
+def health_check():
+    """Health check endpoint for monitoring."""
+    from src.database import engine
+    from sqlalchemy import text
+
+    try:
+        # Check database connection
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+
+        db_status = "healthy"
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        db_status = f"unhealthy: {str(e)}"
+
+    return {
+        "status": "healthy" if db_status == "healthy" else "degraded",
+        "database": db_status,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
 # Response models
 class TicketSummary(BaseModel):
     id: int

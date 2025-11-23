@@ -9,6 +9,17 @@ until pg_isready -h postgres -U helpscout > /dev/null 2>&1; do
     sleep 1
 done
 echo "✓ PostgreSQL is ready"
+echo ""
+
+# Run preflight checks
+echo "🔍 Running preflight checks..."
+if ! python scripts/preflight_check.py; then
+    echo ""
+    echo "❌ Preflight checks failed. Please fix the issues above."
+    echo "   Container will exit now."
+    exit 1
+fi
+echo ""
 
 # Initialize database schema
 echo "📦 Initializing database..."

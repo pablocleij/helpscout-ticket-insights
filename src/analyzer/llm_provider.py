@@ -22,7 +22,7 @@ class OpenAIProvider:
         self.model = model
 
     def analyze_ticket(self, ticket_text: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Analyze ticket using OpenAI."""
+        """Analyze ticket using OpenAI with robust error handling."""
         context = context or {}
 
         system_prompt = """You are an expert support ticket analyzer specializing in categorization and issue identification.
@@ -51,32 +51,164 @@ Return response as valid JSON matching this structure:
 
         user_prompt = f"Analyze this support ticket:\n\n{ticket_text}"
 
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0.3,
-                response_format={"type": "json_object"},
-            )
+        # Retry logic for transient failures
+        max_retries = 3
+        retry_delay = 2  # seconds
 
-            result = json.loads(response.choices[0].message.content)
-            return {
-                "category": result.get("category", "Uncategorized"),
-                "subcategory": result.get("subcategory", "General"),
-                "pain_points": result.get("pain_points", []),
-                "topics": result.get("topics", []),
-                "sentiment": result.get("sentiment", "neutral"),
-                "urgency_score": float(result.get("urgency_score", 0.5)),
-                "suggested_tags": result.get("suggested_tags", []),
-                "summary": result.get("summary", ""),
-                "raw_response": result,
-            }
-        except Exception as e:
-            logger.error(f"OpenAI analysis error: {e}")
-            raise
+        for attempt in range(max_retries):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0.3,
+                    response_format={"type": "json_object"},
+                    timeout=60,
+                )
+
+                result = json.loads(response.choices[0].message.content)
+                return {
+                    "category": result.get("category", "Uncategorized"),
+                    "subcategory": result.get("subcategory", "General"),
+                    "pain_points": result.get("pain_points", []),
+                    "topics": result.get("topics", []),
+                    "sentiment": result.get("sentiment", "neutral"),
+                    "urgency_score": float(result.get("urgency_score", 0.5)),
+                    "suggested_tags": result.get("suggested_tags", []),
+                    "summary": result.get("summary", ""),
+                    "raw_response": result,
+                }
+
+            except json.JSONDecodeError as e:
+                error_msg = (
+                    "Failed to parse OpenAI response as JSON.\n"
+                    "💡 This might indicate:\n"
+                    "   1. OpenAI returned invalid JSON format\n"
+                    "   2. The model hallucinated non-JSON text\n"
+                    f"   → Raw response: {response.choices[0].message.content[:200] if response else 'N/A'}"
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            except Exception as e:
+                error_str = str(e)
+                error_type = type(e).__name__
+
+                # Authentication error
+                if "401" in error_str or "Incorrect API key" in error_str or "invalid_api_key" in error_str:
+                    error_msg = (
+                        "OpenAI API authentication failed.\n"
+                        "💡 Action required:\n"
+                        "   1. Verify OPENAI_API_KEY is correct in .env\n"
+                        "   2. Generate new key at: https://platform.openai.com/api-keys\n"
+                        "   3. Ensure the key starts with 'sk-'\n"
+                        f"   Error: {error_str}"
+                    )
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+
+                # Rate limit error
+                elif "429" in error_str or "rate_limit" in error_str.lower():
+                    if attempt < max_retries - 1:
+                        import time
+                        wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                        logger.warning(
+                            f"OpenAI rate limit hit. Retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})..."
+                        )
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        error_msg = (
+                            "OpenAI API rate limit exceeded after retries.\n"
+                            "💡 Action required:\n"
+                            "   1. Wait a few minutes and try again\n"
+                            "   2. Check your rate limits at: https://platform.openai.com/account/limits\n"
+                            "   3. Consider upgrading your OpenAI plan\n"
+                            "   4. Reduce analysis_batch_size in .env"
+                        )
+                        logger.error(error_msg)
+                        raise RuntimeError(error_msg)
+
+                # Quota/billing error
+                elif "quota" in error_str.lower() or "insufficient_quota" in error_str:
+                    error_msg = (
+                        "OpenAI API quota exceeded.\n"
+                        "💡 Action required:\n"
+                        "   1. Check usage at: https://platform.openai.com/usage\n"
+                        "   2. Add billing/credits at: https://platform.openai.com/account/billing\n"
+                        "   3. Verify your payment method is valid\n"
+                        f"   Error: {error_str}"
+                    )
+                    logger.error(error_msg)
+                    raise RuntimeError(error_msg)
+
+                # Timeout error
+                elif "timeout" in error_str.lower() or error_type == "Timeout":
+                    if attempt < max_retries - 1:
+                        logger.warning(
+                            f"OpenAI API timeout. Retrying (attempt {attempt + 1}/{max_retries})..."
+                        )
+                        continue
+                    else:
+                        error_msg = (
+                            "OpenAI API request timed out after retries.\n"
+                            "💡 This might indicate:\n"
+                            "   1. OpenAI API is experiencing high latency\n"
+                            "   2. Network connectivity issues\n"
+                            "   → Try again in a few minutes"
+                        )
+                        logger.error(error_msg)
+                        raise RuntimeError(error_msg)
+
+                # Model not found error
+                elif "model_not_found" in error_str or "does not exist" in error_str:
+                    error_msg = (
+                        f"OpenAI model '{self.model}' not found.\n"
+                        "💡 Action required:\n"
+                        "   1. Verify OPENAI_MODEL in .env is correct\n"
+                        "   2. Use a valid model like: gpt-4-turbo-preview, gpt-4, gpt-3.5-turbo\n"
+                        "   3. Check available models at: https://platform.openai.com/docs/models\n"
+                        f"   Current model: {self.model}"
+                    )
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+
+                # Connection error
+                elif "connection" in error_str.lower() or error_type == "ConnectionError":
+                    if attempt < max_retries - 1:
+                        import time
+                        logger.warning(
+                            f"OpenAI connection error. Retrying (attempt {attempt + 1}/{max_retries})..."
+                        )
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        error_msg = (
+                            "Cannot connect to OpenAI API after retries.\n"
+                            "💡 Action required:\n"
+                            "   1. Check your internet connection\n"
+                            "   2. Verify firewall allows HTTPS to api.openai.com\n"
+                            f"   Error: {error_str}"
+                        )
+                        logger.error(error_msg)
+                        raise RuntimeError(error_msg)
+
+                # Generic error
+                else:
+                    error_msg = (
+                        f"OpenAI API error: {error_type}: {error_str}\n"
+                        "💡 Action required:\n"
+                        "   1. Check the error message above\n"
+                        "   2. Verify your OpenAI account status\n"
+                        "   3. If issue persists, report this error"
+                    )
+                    logger.error(error_msg)
+                    raise RuntimeError(error_msg)
+
+        # Should never reach here
+        raise RuntimeError("OpenAI analysis failed after all retries")
 
 
 def get_llm_provider() -> OpenAIProvider:

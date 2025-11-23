@@ -50,15 +50,86 @@ class HelpScoutClient:
         """Make API request with error handling."""
         url = f"{self.BASE_URL}/{endpoint}"
         try:
-            response = self.session.request(method, url, params=params, json=json)
+            response = self.session.request(method, url, params=params, json=json, timeout=30)
             response.raise_for_status()
             return response.json()
+
+        except requests.exceptions.Timeout:
+            error_msg = (
+                f"HelpScout API request timed out for {endpoint}.\n"
+                "💡 This usually means:\n"
+                "   1. Network latency is high\n"
+                "   2. HelpScout API is slow to respond\n"
+                "   → The app will retry automatically."
+            )
+            logger.error(error_msg)
+            raise HelpScoutAPIError(error_msg)
+
         except requests.exceptions.HTTPError as e:
-            logger.error(f"HelpScout API error: {e}")
-            raise HelpScoutAPIError(f"API request failed: {e}")
+            status_code = e.response.status_code if e.response else None
+
+            if status_code == 401:
+                error_msg = (
+                    "HelpScout API authentication failed (HTTP 401).\n"
+                    "💡 Action required:\n"
+                    "   1. Verify HELPSCOUT_API_KEY is correct in .env\n"
+                    "   2. Check if the API key has expired\n"
+                    "   3. Generate new key at: https://secure.helpscout.net/apps/custom/"
+                )
+            elif status_code == 403:
+                error_msg = (
+                    "HelpScout API access forbidden (HTTP 403).\n"
+                    "💡 Action required:\n"
+                    "   Your API key doesn't have required permissions.\n"
+                    "   Ensure the app has 'Read' permission for Conversations."
+                )
+            elif status_code == 429:
+                error_msg = (
+                    "HelpScout API rate limit exceeded (HTTP 429).\n"
+                    "💡 Info: The app will automatically retry with backoff.\n"
+                    "   If this persists, contact HelpScout support."
+                )
+            elif status_code and 500 <= status_code < 600:
+                error_msg = (
+                    f"HelpScout API server error (HTTP {status_code}).\n"
+                    "💡 This is a temporary HelpScout issue.\n"
+                    "   The app will retry automatically."
+                )
+            else:
+                error_msg = f"HelpScout API error: {e}\n💡 Check the error above for details."
+
+            logger.error(error_msg)
+            raise HelpScoutAPIError(error_msg)
+
+        except requests.exceptions.ConnectionError as e:
+            error_msg = (
+                "Cannot connect to HelpScout API.\n"
+                "💡 Action required:\n"
+                "   1. Check your internet connection\n"
+                "   2. Verify firewall allows HTTPS to api.helpscout.net\n"
+                f"   3. Error details: {str(e)}"
+            )
+            logger.error(error_msg)
+            raise HelpScoutAPIError(error_msg)
+
+        except ValueError as e:  # JSON parsing error
+            error_msg = (
+                "Failed to parse HelpScout API response.\n"
+                "💡 This might indicate:\n"
+                "   1. HelpScout API format changed\n"
+                "   2. Invalid response received\n"
+                f"   3. Error details: {str(e)}"
+            )
+            logger.error(error_msg)
+            raise HelpScoutAPIError(error_msg)
+
         except Exception as e:
-            logger.error(f"Unexpected error in API request: {e}")
-            raise HelpScoutAPIError(f"Unexpected error: {e}")
+            error_msg = (
+                f"Unexpected error in HelpScout API request: {type(e).__name__}: {str(e)}\n"
+                "💡 This is an unexpected error. Please report this issue."
+            )
+            logger.error(error_msg, exc_info=True)
+            raise HelpScoutAPIError(error_msg)
 
     def get_mailboxes(self) -> List[Dict[str, Any]]:
         """Get all mailboxes."""
