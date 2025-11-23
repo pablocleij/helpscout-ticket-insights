@@ -16,14 +16,15 @@
 
 ## ✨ Features
 
-- 🔄 **Automatic HelpScout sync** with incremental updates
-- 🤖 **LLM analysis** of every ticket (pain points, topics, sentiment, urgency)
-- 📊 **Aggregated insights** dashboard showing top issues and trends
+- ⚡ **Zero-config startup** - automatic database setup, migrations, and first sync
+- 🔄 **Smart sync** - incremental updates with configurable date range
+- 🤖 **Dual analysis** - LLM + statistical categorization for comprehensive insights
+- 📊 **Auto-categorization** - automatically detects categories, subcategories, and patterns
+- 📈 **Time-based filtering** - analyze tickets from specific date ranges
 - 🔔 **Webhook support** for real-time ticket processing
-- 📈 **Time-based analysis** (7/14/30 day windows)
 - 🏷️ **Smart tagging** suggestions from LLM
 - 🌐 **REST API** for integrations
-- 🐳 **Docker-first** for easy deployment
+- 🐳 **Docker-first** - single command deployment
 
 ## 🚀 Quick Start
 
@@ -48,47 +49,74 @@ cd helpscout-ticket-insights
 cp .env.example .env
 ```
 
-Edit `.env` and fill in your credentials:
+Edit `.env` and fill in **just these two required fields**:
 
 ```bash
-# Required
+# Required - get from HelpScout API settings
 HELPSCOUT_API_KEY=your_helpscout_api_key
+
+# Required - get from OpenAI
 OPENAI_API_KEY=your_openai_api_key
 
-# Optional - for webhooks
-HELPSCOUT_APP_ID=your_app_id
-HELPSCOUT_APP_SECRET=your_app_secret
-HELPSCOUT_WEBHOOK_SECRET=your_webhook_secret
+# Optional - sync only tickets from this date onwards (saves time & LLM costs)
+SYNC_START_DATE=2024-01-01
+
+# Optional - limit initial sync (0 = unlimited)
+SYNC_INITIAL_LIMIT=1000
 ```
 
-3. **Start the application**
+3. **Start everything**
 
 ```bash
 docker compose up -d
 ```
 
-4. **Initialize the database and run first sync**
+**That's it!** 🎉 The system will automatically:
+- ✅ Wait for database to be ready
+- ✅ Run migrations
+- ✅ Sync your HelpScout tickets (from `SYNC_START_DATE` if set)
+- ✅ Analyze tickets with LLM
+- ✅ Generate statistical categories
+- ✅ Aggregate insights
+- ✅ Start the web UI
 
+4. **Access the dashboard**
+
+Open http://localhost:8000 in your browser (wait 2-3 minutes for first sync to complete)
+
+**View logs:**
 ```bash
-docker compose exec api python scripts/init_db.py
+docker compose logs -f api
 ```
-
-5. **Access the dashboard**
-
-Open http://localhost:8000 in your browser
-
-That's it! 🎉
 
 ## 📋 Usage
 
 ### View Insights
 
 Visit http://localhost:8000 to see:
-- Top pain points across all tickets
-- Most common topics
-- Sentiment distribution
-- Average urgency scores
-- Recent ticket list
+- **LLM-extracted insights**: Top pain points, topics, sentiment, urgency
+- **Auto-detected categories**: Statistical analysis finds patterns automatically
+- **Frequent tags**: Most common HelpScout tags
+- **Time-based trends**: Analyze specific date ranges
+- **Recent tickets**: Browse and search your synced tickets
+
+### Automatic Categorization
+
+The system uses **dual analysis** for comprehensive insights:
+
+1. **LLM Analysis** (OpenAI/Anthropic):
+   - Identifies specific pain points
+   - Extracts topics and themes
+   - Determines sentiment and urgency
+   - Suggests relevant tags
+
+2. **Statistical Analysis** (No LLM needed):
+   - Automatically detects main categories from keywords
+   - Clusters similar tickets by tags
+   - Finds common subject line patterns
+   - Builds hierarchical category structure
+
+This approach gives you **instant insights** without waiting for LLM analysis on every ticket, while still providing deep analysis where it matters.
 
 ### API Endpoints
 
@@ -110,6 +138,9 @@ POST /api/analyze
 
 # Check sync status
 GET /api/sync-status
+
+# Get auto-detected categories
+GET /api/categories?days=30
 
 # Health check
 GET /health
@@ -226,13 +257,37 @@ flake8 src tests --max-line-length=100
 |----------|----------|---------|-------------|
 | `HELPSCOUT_API_KEY` | Yes | - | HelpScout API key |
 | `OPENAI_API_KEY` | Yes* | - | OpenAI API key |
+| **Sync Configuration** ||||
+| `SYNC_START_DATE` | No | - | Only sync tickets from this date (ISO format: `2024-01-01`) |
+| `SYNC_INITIAL_LIMIT` | No | `0` | Max tickets on first sync (`0` = unlimited, respects `MAX_TICKETS_PER_SYNC`) |
+| `AUTO_INITIAL_SYNC` | No | `true` | Run sync automatically on first startup |
+| `AUTO_INITIAL_ANALYSIS` | No | `true` | Run analysis automatically after sync |
+| `SYNC_INTERVAL_HOURS` | No | `6` | Hours between automatic syncs |
+| `MAX_TICKETS_PER_SYNC` | No | `1000` | Max tickets per sync operation |
+| **Analysis Configuration** ||||
 | `LLM_PROVIDER` | No | `openai` | LLM provider (`openai`, `anthropic`) |
-| `SYNC_INTERVAL_HOURS` | No | `6` | Hours between syncs |
 | `ANALYSIS_BATCH_SIZE` | No | `50` | Tickets to analyze per batch |
 | `ANALYSIS_LOOKBACK_DAYS` | No | `7` | Days to include in insights |
+| `ENABLE_AUTO_CATEGORIZATION` | No | `true` | Enable statistical category extraction |
+| `CATEGORY_MIN_OCCURRENCES` | No | `2` | Min occurrences for a category |
 | `TOP_INSIGHTS_LIMIT` | No | `10` | Number of top items to show |
 
 *Required if using OpenAI. For Anthropic, set `ANTHROPIC_API_KEY` instead.
+
+#### Key Settings for Quick Start
+
+For the **fastest startup** with **minimal LLM costs**:
+
+```bash
+# Only sync recent tickets
+SYNC_START_DATE=2024-11-01
+
+# Limit initial sync
+SYNC_INITIAL_LIMIT=100
+
+# Enable auto-categorization (free, no LLM needed)
+ENABLE_AUTO_CATEGORIZATION=true
+```
 
 ### LLM Providers
 

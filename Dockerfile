@@ -6,6 +6,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
+    redis-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -18,8 +19,14 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p data logs attachments
 
+# Make startup script executable
+RUN chmod +x scripts/startup.sh
+
 # Expose port
 EXPOSE 8000
 
-# Default command (can be overridden in docker-compose)
+# Use startup script as entrypoint
+ENTRYPOINT ["scripts/startup.sh"]
+
+# Default command (passed to startup script)
 CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

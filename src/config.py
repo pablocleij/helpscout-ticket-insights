@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     analysis_batch_size: int = 50
     max_tickets_per_sync: int = 1000
 
+    # Initial Sync Configuration
+    sync_start_date: Optional[str] = None
+    sync_initial_limit: int = 0
+    auto_initial_sync: bool = True
+    auto_initial_analysis: bool = True
+
     # API Settings
     api_host: str = "0.0.0.0"
     api_port: int = 8000
@@ -44,6 +50,8 @@ class Settings(BaseSettings):
     analysis_lookback_days: int = 7
     top_insights_limit: int = 10
     enable_embeddings: bool = False
+    enable_auto_categorization: bool = True
+    category_min_occurrences: int = 2
 
     @property
     def is_development(self) -> bool:

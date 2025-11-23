@@ -12,6 +12,7 @@ from src.database import get_db
 from src.models import Ticket, TicketAnalysis, AggregatedInsight, SyncState
 from src.analyzer.aggregator import InsightAggregator
 from src.analyzer.pipeline import AnalysisPipeline
+from src.analyzer.auto_categorizer import AutoCategorizer
 from src.syncer.helpscout import HelpScoutSyncer
 from src.config import settings
 
@@ -219,3 +220,25 @@ def get_sync_status(db: Session = Depends(get_db)):
         )
         for state in sync_states
     ]
+
+
+@router.get("/categories")
+def get_auto_categories(
+    days: int = Query(default=30, ge=1, le=90),
+    db: Session = Depends(get_db),
+):
+    """Get automatically extracted categories and subcategories."""
+    if not settings.enable_auto_categorization:
+        return {
+            "enabled": False,
+            "message": "Auto-categorization is disabled. Enable with ENABLE_AUTO_CATEGORIZATION=true",
+        }
+
+    categorizer = AutoCategorizer(db)
+    summary = categorizer.get_category_summary(days=days)
+
+    return {
+        "enabled": True,
+        "days": days,
+        "categories": summary,
+    }

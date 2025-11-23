@@ -270,10 +270,19 @@
                 <div class="loading">Loading sentiments...</div>
             </div>
         </div>
+
+        <div class="section">
+            <h2>Auto-Detected Categories</h2>
+            <p class="subtitle">Statistical analysis of ticket patterns</p>
+            <div id="categories">
+                <div class="loading">Loading categories...</div>
+            </div>
+        </div>
     </div>
 
     <script>
         let currentData = null;
+        let categoriesData = null;
 
         async function loadInsights() {
             const days = document.getElementById('daysFilter').value;
@@ -287,9 +296,28 @@
 
                 currentData = await response.json();
                 renderInsights(currentData);
+
+                // Load categories
+                loadCategories(days);
             } catch (error) {
                 console.error('Error loading insights:', error);
                 showError(`Failed to load insights: ${error.message}`);
+            }
+        }
+
+        async function loadCategories(days) {
+            try {
+                const response = await fetch(`/api/categories?days=${days || 30}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                categoriesData = await response.json();
+                renderCategories(categoriesData);
+            } catch (error) {
+                console.error('Error loading categories:', error);
+                const categoriesEl = document.getElementById('categories');
+                categoriesEl.innerHTML = '<div class="empty-state">Auto-categorization not available</div>';
             }
         }
 
@@ -384,6 +412,47 @@
             } else {
                 errorEl.style.display = 'none';
             }
+        }
+
+        function renderCategories(data) {
+            const categoriesEl = document.getElementById('categories');
+
+            if (!data.enabled) {
+                categoriesEl.innerHTML = '<div class="empty-state">Auto-categorization is disabled</div>';
+                return;
+            }
+
+            const categories = data.categories;
+            let html = '';
+
+            // Main categories
+            if (categories.main_categories && categories.main_categories.length > 0) {
+                html += '<h3 style="font-size: 16px; margin-bottom: 10px;">Main Categories</h3>';
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 20px;">';
+
+                categories.main_categories.forEach(cat => {
+                    html += `
+                        <div class="insight-item" style="border-left-color: #e74c3c;">
+                            <div class="insight-text">${escapeHtml(cat.category)}</div>
+                            <div class="insight-meta">${cat.count} tickets</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            // Top tags
+            if (categories.top_tags && categories.top_tags.length > 0) {
+                html += '<h3 style="font-size: 16px; margin-bottom: 10px;">Frequent Tags</h3>';
+                html += '<div class="sentiment-badges" style="flex-wrap: wrap;">';
+
+                categories.top_tags.forEach(tag => {
+                    html += `<span class="badge badge-neutral">${escapeHtml(tag.tag)}: ${tag.count}</span>`;
+                });
+                html += '</div>';
+            }
+
+            categoriesEl.innerHTML = html || '<div class="empty-state">No categories detected yet</div>';
         }
 
         function escapeHtml(text) {

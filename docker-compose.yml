@@ -54,7 +54,7 @@ services:
   worker:
     build: .
     container_name: helpscout-worker
-    command: python -m src.workers.worker
+    entrypoint: ["python", "-m", "src.workers.worker"]
     env_file:
       - .env
     environment:
@@ -65,27 +65,9 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      api:
+        condition: service_started
     restart: unless-stopped
-
-  # Optional: Run migrations on startup
-  migrate:
-    build: .
-    container_name: helpscout-migrate
-    command: alembic upgrade head
-    env_file:
-      - .env
-    environment:
-      - DATABASE_URL=postgresql://helpscout:helpscout@postgres:5432/helpscout_insights
-    volumes:
-      - .:/app
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
 
 volumes:
   postgres_data:

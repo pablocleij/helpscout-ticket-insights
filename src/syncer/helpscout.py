@@ -134,6 +134,17 @@ class HelpScoutSyncer:
         else:
             logger.info("Full sync")
 
+        # Get start date filter if configured
+        start_date_filter = None
+        if settings.sync_start_date:
+            try:
+                start_date_filter = datetime.fromisoformat(
+                    settings.sync_start_date.replace("Z", "+00:00")
+                )
+                logger.info(f"Filtering tickets from {start_date_filter}")
+            except Exception as e:
+                logger.warning(f"Invalid SYNC_START_DATE: {e}")
+
         page = 1
         total_synced = 0
 
@@ -148,6 +159,12 @@ class HelpScoutSyncer:
                 break
 
             for conv in conversations:
+                # Filter by start date if configured
+                if start_date_filter:
+                    created_at = self._parse_datetime(conv.get("createdAt"))
+                    if created_at and created_at < start_date_filter:
+                        logger.debug(f"Skipping ticket {conv.get('id')} - before start date")
+                        continue
                 try:
                     # Sync conversation and threads
                     self._sync_conversation(conv, mailbox_id, mailbox_name)
