@@ -24,6 +24,7 @@ Everything else has been removed to keep it **simple, fast, and reliable**.
 - 📝 **Thread summarization** - comprehensive summaries covering entire conversation arcs
 - 🔎 **Entity search** - find tickets by product, error code, or keyword
 - 📊 **Product insights** - identify which products generate most issues and common error patterns
+- 🧠 **Root cause analysis** - AI-powered pattern detection with actionable suggestions and confidence scores
 - 📈 **Statistical analysis** - distribution, trending, cross-analysis on LLM data
 - 🔄 **Fault-tolerant sync** - duplicate detection, batch commits, auto-retry
 - 🏥 **Health checks** - monitoring endpoint for production deployments
@@ -130,6 +131,118 @@ GET /api/search/tickets?product=iOS+app&days=30
 GET /api/search/tickets?error_code=500&days=30
 GET /api/search/tickets?complaint_keyword=slow&days=30
 # Combine filters: ?product=API&error_code=timeout&days=7
+```
+
+### 🆕 Root Cause Analysis Endpoints
+
+```bash
+# Deep analysis for specific product (includes root cause hints + actions)
+GET /api/entities/products/{product}/analysis?days=30
+# Example: GET /api/entities/products/iOS%20app/analysis
+
+# Deep analysis for specific error code
+GET /api/entities/errors/{error_code}/analysis?days=30
+# Example: GET /api/entities/errors/500%20error/analysis
+```
+
+**What you get:**
+- **Root Cause Hints**: Pattern detection with confidence scores and hypotheses
+- **Suggested Actions**: Prioritized action items with reasoning and impact estimates
+- **Temporal Analysis**: Timeline of when issues occurred, spike detection
+- **Sample Tickets**: Recent examples for investigation
+
+### Example: Product Root Cause Analysis Response
+
+```json
+{
+  "product": "iOS app",
+  "period_days": 30,
+  "summary": {
+    "total_tickets": 45,
+    "avg_urgency": 0.72,
+    "sentiment_distribution": {
+      "negative": 35,
+      "neutral": 8,
+      "positive": 2
+    },
+    "top_categories": {
+      "Technical Issue": 30,
+      "Performance": 10
+    },
+    "common_errors": {
+      "crash on startup": 12,
+      "memory leak": 8
+    }
+  },
+  "root_cause_hints": [
+    {
+      "pattern": "date_clustering",
+      "confidence": 0.87,
+      "evidence": {
+        "clustered_date": "Nov 15",
+        "tickets_mentioning_date": 34,
+        "percentage": 75.6,
+        "example_mentions": ["since Nov 15", "after update", "yesterday's release"]
+      },
+      "hypothesis": "Issues started around Nov 15 - potential release, update, or external event trigger"
+    },
+    {
+      "pattern": "error_cooccurrence",
+      "confidence": 0.92,
+      "evidence": {
+        "error_pair": ["crash on startup", "memory leak"],
+        "cooccurrence_count": 12
+      },
+      "hypothesis": "Errors 'crash on startup' and 'memory leak' appear together frequently - likely related to same underlying issue"
+    }
+  ],
+  "suggested_actions": [
+    {
+      "priority": 1,
+      "action": "Investigate changes/releases around Nov 15",
+      "reasoning": "87% confidence that issues started around Nov 15",
+      "estimated_impact": "Could resolve 34/45 tickets",
+      "next_steps": [
+        "Check deployment logs for releases near this date",
+        "Review code changes merged around this time",
+        "Consider rollback if recent release"
+      ]
+    },
+    {
+      "priority": 2,
+      "action": "Investigate connection between 'crash on startup' and 'memory leak'",
+      "reasoning": "These errors co-occur in 12 tickets - likely same root cause",
+      "estimated_impact": "Could resolve 12/45 tickets",
+      "next_steps": [
+        "Search logs for 'crash on startup' AND 'memory leak'",
+        "Check if these errors are in same code path",
+        "Review error handling in affected module"
+      ]
+    }
+  ],
+  "temporal_analysis": {
+    "peak_date": "2024-11-15",
+    "peak_ticket_count": 18,
+    "average_per_day": 5.2,
+    "spike_ratio": 3.46,
+    "is_spike": true,
+    "timeline": {
+      "2024-11-14": 3,
+      "2024-11-15": 18,
+      "2024-11-16": 12,
+      "2024-11-17": 7
+    }
+  },
+  "sample_tickets": [
+    {
+      "id": 123,
+      "number": 4567,
+      "subject": "iOS app crashing after update",
+      "summary": "Customer reports app crashes on startup since Nov 15...",
+      "urgency": 0.85
+    }
+  ]
+}
 ```
 
 ### Example: Product Insights Response

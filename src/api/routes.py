@@ -404,3 +404,203 @@ def search_tickets_by_entity(
         "total_matches": len(filtered_tickets),
         "tickets": filtered_tickets[:limit],
     }
+
+
+@router.get("/entities/products/{product}/analysis")
+def get_product_root_cause_analysis(
+    product: str,
+    days: int = Query(default=30, ge=1, le=365),
+    db: Session = Depends(get_db),
+):
+    """
+    Get deep root cause analysis for a specific product.
+
+    Returns pattern detection, hypotheses, and suggested actions.
+    """
+    from src.analyzer.root_cause import RootCauseAnalyzer
+
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+    # Get all tickets mentioning this product
+    query = (
+        db.query(Ticket, TicketAnalysis)
+        .join(TicketAnalysis)
+        .filter(Ticket.created_at >= cutoff_date)
+        .filter(TicketAnalysis.extracted_entities.isnot(None))
+    )
+
+    results = query.all()
+
+    # Filter to tickets mentioning this product
+    matching_tickets = []
+    for ticket, analysis in results:
+        entities = analysis.extracted_entities or {}
+        products = entities.get("products", [])
+
+        if any(product.lower() in p.lower() for p in products):
+            matching_tickets.append({
+                "ticket": {
+                    "id": ticket.id,
+                    "helpscout_id": ticket.helpscout_id,
+                    "number": ticket.number,
+                    "subject": ticket.subject,
+                    "status": ticket.status,
+                    "created_at": ticket.created_at,
+                },
+                "analysis": {
+                    "category": analysis.category,
+                    "sentiment": analysis.sentiment,
+                    "urgency_score": analysis.urgency_score,
+                    "summary": analysis.summary,
+                },
+                "entities": entities,
+            })
+
+    if not matching_tickets:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No tickets found mentioning product '{product}' in last {days} days"
+        )
+
+    # Run root cause analysis
+    analyzer = RootCauseAnalyzer(matching_tickets)
+    analysis_result = analyzer.analyze()
+
+    # Calculate basic stats
+    total_tickets = len(matching_tickets)
+    sentiments = Counter(t["analysis"]["sentiment"] for t in matching_tickets)
+    avg_urgency = sum(t["analysis"]["urgency_score"] for t in matching_tickets) / total_tickets
+
+    # Get top categories
+    categories = Counter(t["analysis"]["category"] for t in matching_tickets)
+
+    # Get associated errors
+    error_counter = Counter()
+    for t in matching_tickets:
+        for error in t["entities"].get("error_codes", []):
+            error_counter[error] += 1
+
+    return {
+        "product": product,
+        "period_days": days,
+        "summary": {
+            "total_tickets": total_tickets,
+            "avg_urgency": round(avg_urgency, 2),
+            "sentiment_distribution": dict(sentiments),
+            "top_categories": dict(categories.most_common(3)),
+            "common_errors": dict(error_counter.most_common(5)),
+        },
+        "root_cause_hints": analysis_result["root_cause_hints"],
+        "suggested_actions": analysis_result["suggested_actions"],
+        "temporal_analysis": analysis_result["temporal_analysis"],
+        "sample_tickets": [
+            {
+                "id": t["ticket"]["id"],
+                "number": t["ticket"]["number"],
+                "subject": t["ticket"]["subject"],
+                "summary": t["analysis"]["summary"],
+                "urgency": t["analysis"]["urgency_score"],
+            }
+            for t in matching_tickets[:5]
+        ],
+    }
+
+
+@router.get("/entities/errors/{error_code}/analysis")
+def get_error_root_cause_analysis(
+    error_code: str,
+    days: int = Query(default=30, ge=1, le=365),
+    db: Session = Depends(get_db),
+):
+    """
+    Get deep root cause analysis for a specific error code.
+
+    Returns pattern detection, hypotheses, and suggested actions.
+    """
+    from src.analyzer.root_cause import RootCauseAnalyzer
+
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+    # Get all tickets mentioning this error
+    query = (
+        db.query(Ticket, TicketAnalysis)
+        .join(TicketAnalysis)
+        .filter(Ticket.created_at >= cutoff_date)
+        .filter(TicketAnalysis.extracted_entities.isnot(None))
+    )
+
+    results = query.all()
+
+    # Filter to tickets mentioning this error
+    matching_tickets = []
+    for ticket, analysis in results:
+        entities = analysis.extracted_entities or {}
+        errors = entities.get("error_codes", [])
+
+        if any(error_code.lower() in e.lower() for e in errors):
+            matching_tickets.append({
+                "ticket": {
+                    "id": ticket.id,
+                    "helpscout_id": ticket.helpscout_id,
+                    "number": ticket.number,
+                    "subject": ticket.subject,
+                    "status": ticket.status,
+                    "created_at": ticket.created_at,
+                },
+                "analysis": {
+                    "category": analysis.category,
+                    "sentiment": analysis.sentiment,
+                    "urgency_score": analysis.urgency_score,
+                    "summary": analysis.summary,
+                },
+                "entities": entities,
+            })
+
+    if not matching_tickets:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No tickets found with error code '{error_code}' in last {days} days"
+        )
+
+    # Run root cause analysis
+    analyzer = RootCauseAnalyzer(matching_tickets)
+    analysis_result = analyzer.analyze()
+
+    # Calculate basic stats
+    total_tickets = len(matching_tickets)
+    sentiments = Counter(t["analysis"]["sentiment"] for t in matching_tickets)
+    avg_urgency = sum(t["analysis"]["urgency_score"] for t in matching_tickets) / total_tickets
+
+    # Get top categories
+    categories = Counter(t["analysis"]["category"] for t in matching_tickets)
+
+    # Get affected products
+    product_counter = Counter()
+    for t in matching_tickets:
+        for prod in t["entities"].get("products", []):
+            product_counter[prod] += 1
+
+    return {
+        "error_code": error_code,
+        "period_days": days,
+        "summary": {
+            "total_tickets": total_tickets,
+            "avg_urgency": round(avg_urgency, 2),
+            "sentiment_distribution": dict(sentiments),
+            "top_categories": dict(categories.most_common(3)),
+            "affected_products": dict(product_counter.most_common(5)),
+        },
+        "root_cause_hints": analysis_result["root_cause_hints"],
+        "suggested_actions": analysis_result["suggested_actions"],
+        "temporal_analysis": analysis_result["temporal_analysis"],
+        "sample_tickets": [
+            {
+                "id": t["ticket"]["id"],
+                "number": t["ticket"]["number"],
+                "subject": t["ticket"]["subject"],
+                "summary": t["analysis"]["summary"],
+                "urgency": t["analysis"]["urgency_score"],
+            }
+            for t in matching_tickets[:5]
+        ],
+    }
