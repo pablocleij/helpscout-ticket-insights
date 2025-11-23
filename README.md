@@ -271,7 +271,7 @@ This creates 10 mock tickets, runs analysis, and verifies:
 | `HELPSCOUT_API_KEY` | ✅ Yes | - | HelpScout API key |
 | `OPENAI_API_KEY` | ✅ Yes | - | OpenAI API key (must start with `sk-`) |
 | `DATABASE_URL` | No | `postgresql://...` | PostgreSQL connection string |
-| `OPENAI_MODEL` | No | `gpt-4-turbo-preview` | OpenAI model to use |
+| `OPENAI_MODEL` | No | `gpt-4o` | OpenAI model to use (gpt-4o or gpt-4o-mini) |
 | `LOG_LEVEL` | No | `INFO` | Logging level |
 | **Sync Configuration** ||||
 | `SYNC_START_DATE` | No | - | Only sync tickets from this date (ISO: `2024-01-01`) |

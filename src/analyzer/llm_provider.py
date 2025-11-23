@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class OpenAIProvider:
     """OpenAI GPT-based provider."""
 
-    def __init__(self, api_key: str, model: str = "gpt-4-turbo-preview"):
+    def __init__(self, api_key: str, model: str = "gpt-4o"):
         try:
             from openai import OpenAI
         except ImportError:
@@ -168,7 +168,7 @@ Return response as valid JSON matching this structure:
                         f"OpenAI model '{self.model}' not found.\n"
                         "💡 Action required:\n"
                         "   1. Verify OPENAI_MODEL in .env is correct\n"
-                        "   2. Use a valid model like: gpt-4-turbo-preview, gpt-4, gpt-3.5-turbo\n"
+                        "   2. Use a supported model: gpt-4o (recommended), gpt-4o-mini\n"
                         "   3. Check available models at: https://platform.openai.com/docs/models\n"
                         f"   Current model: {self.model}"
                     )
