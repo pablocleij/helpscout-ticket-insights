@@ -35,16 +35,22 @@ class OpenAIProvider(LLMProvider):
         """Analyze ticket using OpenAI."""
         context = context or {}
 
-        system_prompt = """You are an expert support ticket analyzer. Analyze the ticket and provide:
-1. pain_points: List of specific customer pain points or issues (max 5)
-2. topics: Main topics/categories (max 5)
-3. sentiment: Overall sentiment (positive/neutral/negative)
-4. urgency_score: Urgency from 0.0 (low) to 1.0 (critical)
-5. suggested_tags: Relevant tags for categorization (max 5)
-6. summary: Brief 1-2 sentence summary
+        system_prompt = """You are an expert support ticket analyzer specializing in categorization and issue identification.
+
+Analyze the ticket and provide:
+1. category: Primary category (e.g., "Billing", "Technical Issue", "Feature Request", "Account Access", "Integration", "Performance", "Data Management", "UI/UX")
+2. subcategory: Specific subcategory under the main category (e.g., for "Billing" → "Payment Failed", "Invoice Question", "Refund Request")
+3. pain_points: List of specific customer pain points or issues (max 5)
+4. topics: Related topics or themes (max 5)
+5. sentiment: Overall sentiment (positive/neutral/negative)
+6. urgency_score: Urgency from 0.0 (low) to 1.0 (critical)
+7. suggested_tags: Relevant tags for quick filtering (max 5)
+8. summary: Brief 1-2 sentence summary of the issue
 
 Return response as valid JSON matching this structure:
 {
+    "category": "string",
+    "subcategory": "string",
     "pain_points": ["string"],
     "topics": ["string"],
     "sentiment": "string",
@@ -68,6 +74,8 @@ Return response as valid JSON matching this structure:
 
             result = json.loads(response.choices[0].message.content)
             return {
+                "category": result.get("category", "Uncategorized"),
+                "subcategory": result.get("subcategory", "General"),
                 "pain_points": result.get("pain_points", []),
                 "topics": result.get("topics", []),
                 "sentiment": result.get("sentiment", "neutral"),
@@ -97,13 +105,15 @@ class AnthropicProvider(LLMProvider):
         """Analyze ticket using Anthropic Claude."""
         context = context or {}
 
-        prompt = f"""Analyze this support ticket and provide structured insights.
+        prompt = f"""Analyze this support ticket and provide structured categorization and insights.
 
 Ticket:
 {ticket_text}
 
 Please provide your analysis in the following JSON format:
 {{
+    "category": "Primary category (e.g., Billing, Technical Issue, Feature Request, Account Access)",
+    "subcategory": "Specific subcategory under main category",
     "pain_points": ["specific pain point 1", "pain point 2"],
     "topics": ["topic1", "topic2"],
     "sentiment": "positive|neutral|negative",
@@ -113,11 +123,12 @@ Please provide your analysis in the following JSON format:
 }}
 
 Focus on:
-1. Identifying specific customer pain points
-2. Categorizing main topics
-3. Assessing sentiment and urgency
-4. Suggesting relevant tags
-5. Providing a concise summary"""
+1. Hierarchical categorization (category → subcategory)
+2. Identifying specific customer pain points
+3. Related topics and themes
+4. Assessing sentiment and urgency
+5. Suggesting relevant tags
+6. Providing a concise summary"""
 
         try:
             response = self.client.messages.create(
@@ -136,6 +147,8 @@ Focus on:
 
             result = json.loads(content)
             return {
+                "category": result.get("category", "Uncategorized"),
+                "subcategory": result.get("subcategory", "General"),
                 "pain_points": result.get("pain_points", []),
                 "topics": result.get("topics", []),
                 "sentiment": result.get("sentiment", "neutral"),

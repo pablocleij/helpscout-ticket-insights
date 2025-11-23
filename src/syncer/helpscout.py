@@ -120,8 +120,15 @@ class HelpScoutSyncer:
     def sync_mailbox(
         self, mailbox_id: int, mailbox_name: str, full_sync: bool = False
     ) -> Dict[str, int]:
-        """Sync a specific mailbox."""
-        stats = {"tickets": 0, "threads": 0}
+        """Sync a specific mailbox with robust error handling and duplicate prevention."""
+        stats = {
+            "tickets": 0,
+            "threads": 0,
+            "updated": 0,
+            "created": 0,
+            "skipped": 0,
+            "errors": 0,
+        }
 
         # Get sync state
         sync_state = self.db.query(SyncState).filter_by(mailbox_id=mailbox_id).first()
@@ -147,38 +154,77 @@ class HelpScoutSyncer:
 
         page = 1
         total_synced = 0
+        batch_size = 10  # Commit every N tickets
 
         while True:
             # Fetch conversations
-            response = self.client.get_conversations(
-                mailbox_id=mailbox_id, modified_since=modified_since, page=page
-            )
+            try:
+                response = self.client.get_conversations(
+                    mailbox_id=mailbox_id, modified_since=modified_since, page=page
+                )
+            except Exception as e:
+                logger.error(f"Error fetching conversations page {page}: {e}")
+                break
 
             conversations = response.get("_embedded", {}).get("conversations", [])
             if not conversations:
                 break
 
-            for conv in conversations:
+            for i, conv in enumerate(conversations):
                 # Filter by start date if configured
                 if start_date_filter:
                     created_at = self._parse_datetime(conv.get("createdAt"))
                     if created_at and created_at < start_date_filter:
                         logger.debug(f"Skipping ticket {conv.get('id')} - before start date")
+                        stats["skipped"] += 1
                         continue
+
                 try:
+                    # Check if ticket already exists (duplicate detection)
+                    helpscout_id = conv.get("id")
+                    existing = (
+                        self.db.query(Ticket).filter_by(helpscout_id=helpscout_id).first()
+                    )
+
                     # Sync conversation and threads
                     self._sync_conversation(conv, mailbox_id, mailbox_name)
+
+                    if existing:
+                        stats["updated"] += 1
+                        logger.debug(f"Updated ticket {helpscout_id}")
+                    else:
+                        stats["created"] += 1
+                        logger.debug(f"Created ticket {helpscout_id}")
+
                     stats["tickets"] += 1
                     total_synced += 1
 
+                    # Batch commits for performance
+                    if (i + 1) % batch_size == 0:
+                        self.db.commit()
+                        logger.debug(f"Committed batch of {batch_size} tickets")
+
                     # Respect rate limits
                     if total_synced >= settings.max_tickets_per_sync:
-                        logger.warning(f"Reached max tickets limit: {settings.max_tickets_per_sync}")
+                        logger.warning(
+                            f"Reached max tickets limit: {settings.max_tickets_per_sync}"
+                        )
                         break
 
                 except Exception as e:
-                    logger.error(f"Error syncing conversation {conv.get('id')}: {e}")
+                    logger.error(
+                        f"Error syncing conversation {conv.get('id')}: {e}", exc_info=True
+                    )
+                    stats["errors"] += 1
+                    self.db.rollback()  # Rollback failed transaction
                     continue
+
+            # Commit remaining tickets in batch
+            try:
+                self.db.commit()
+            except Exception as e:
+                logger.error(f"Error committing batch: {e}")
+                self.db.rollback()
 
             # Check if there are more pages
             page_info = response.get("page", {})
@@ -192,16 +238,26 @@ class HelpScoutSyncer:
                 break
 
         # Update sync state
-        if not sync_state:
-            sync_state = SyncState(mailbox_id=mailbox_id)
-            self.db.add(sync_state)
+        try:
+            if not sync_state:
+                sync_state = SyncState(mailbox_id=mailbox_id)
+                self.db.add(sync_state)
 
-        sync_state.last_sync_at = datetime.utcnow()
-        sync_state.last_modified_at = datetime.utcnow()
-        sync_state.total_tickets_synced = sync_state.total_tickets_synced + total_synced
-        self.db.commit()
+            sync_state.last_sync_at = datetime.utcnow()
+            sync_state.last_modified_at = datetime.utcnow()
+            sync_state.total_tickets_synced = (
+                sync_state.total_tickets_synced or 0
+            ) + total_synced
+            self.db.commit()
+        except Exception as e:
+            logger.error(f"Error updating sync state: {e}")
+            self.db.rollback()
 
-        logger.info(f"Mailbox {mailbox_id} sync complete: {stats}")
+        logger.info(
+            f"Mailbox {mailbox_id} sync complete - "
+            f"Created: {stats['created']}, Updated: {stats['updated']}, "
+            f"Skipped: {stats['skipped']}, Errors: {stats['errors']}"
+        )
         return stats
 
     def _sync_conversation(

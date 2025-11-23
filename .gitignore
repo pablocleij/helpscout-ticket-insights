@@ -61,5 +61,4 @@ htmlcov/
 .pytest_cache/
 
 # Alembic
-alembic/versions/*.py
-!alembic/versions/.gitkeep
+# (migrations are tracked in git)

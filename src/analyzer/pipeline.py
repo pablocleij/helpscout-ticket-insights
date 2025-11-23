@@ -41,6 +41,8 @@ class AnalysisPipeline:
 
         if analysis:
             # Update existing analysis
+            analysis.category = analysis_result["category"]
+            analysis.subcategory = analysis_result["subcategory"]
             analysis.pain_points = analysis_result["pain_points"]
             analysis.topics = analysis_result["topics"]
             analysis.sentiment = analysis_result["sentiment"]
@@ -55,6 +57,8 @@ class AnalysisPipeline:
             # Create new analysis
             analysis = TicketAnalysis(
                 ticket_id=ticket_id,
+                category=analysis_result["category"],
+                subcategory=analysis_result["subcategory"],
                 pain_points=analysis_result["pain_points"],
                 topics=analysis_result["topics"],
                 sentiment=analysis_result["sentiment"],

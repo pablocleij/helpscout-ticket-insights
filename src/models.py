@@ -84,6 +84,8 @@ class TicketAnalysis(Base):
     ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False)
 
     # Analysis results
+    category = Column(String(100), index=True)  # Primary category
+    subcategory = Column(String(100), index=True)  # Subcategory
     pain_points = Column(JSON)  # List of identified pain points
     topics = Column(JSON)  # List of topics/categories
     sentiment = Column(String(50))  # positive, negative, neutral
@@ -100,7 +102,10 @@ class TicketAnalysis(Base):
     # Relationships
     ticket = relationship("Ticket", back_populates="analysis")
 
-    __table_args__ = (Index("idx_analysis_analyzed_at", "analyzed_at"),)
+    __table_args__ = (
+        Index("idx_analysis_analyzed_at", "analyzed_at"),
+        Index("idx_analysis_category", "category", "subcategory"),
+    )
 
 
 class AggregatedInsight(Base):

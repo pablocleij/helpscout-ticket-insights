@@ -13,6 +13,7 @@ from src.models import Ticket, TicketAnalysis, AggregatedInsight, SyncState
 from src.analyzer.aggregator import InsightAggregator
 from src.analyzer.pipeline import AnalysisPipeline
 from src.analyzer.auto_categorizer import AutoCategorizer
+from src.analyzer.stats_analyzer import StatisticalAnalyzer
 from src.syncer.helpscout import HelpScoutSyncer
 from src.config import settings
 
@@ -242,3 +243,36 @@ def get_auto_categories(
         "days": days,
         "categories": summary,
     }
+
+
+@router.get("/categories/stats")
+def get_category_statistics(
+    days: int = Query(default=7, ge=1, le=90),
+    db: Session = Depends(get_db),
+):
+    """
+    Get statistical analysis of LLM-assigned categories.
+
+    This runs AFTER LLM labeling and provides distribution analysis,
+    cross-analysis with sentiment/urgency, and trending data.
+    """
+    analyzer = StatisticalAnalyzer(db)
+    stats = analyzer.analyze_categories(days=days)
+
+    return stats
+
+
+@router.get("/categories/{category}")
+def get_category_breakdown(
+    category: str,
+    days: int = Query(default=7, ge=1, le=90),
+    db: Session = Depends(get_db),
+):
+    """Get detailed breakdown for a specific LLM category."""
+    analyzer = StatisticalAnalyzer(db)
+    breakdown = analyzer.get_category_breakdown(category, days=days)
+
+    if breakdown.get("count", 0) == 0:
+        raise HTTPException(status_code=404, detail=f"No tickets found in category '{category}'")
+
+    return breakdown
