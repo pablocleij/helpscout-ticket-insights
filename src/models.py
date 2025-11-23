@@ -108,33 +108,6 @@ class TicketAnalysis(Base):
     )
 
 
-class AggregatedInsight(Base):
-    """Aggregated insights across tickets for a time period."""
-
-    __tablename__ = "aggregated_insights"
-
-    id = Column(Integer, primary_key=True, index=True)
-    period_start = Column(DateTime, nullable=False, index=True)
-    period_end = Column(DateTime, nullable=False, index=True)
-    mailbox_id = Column(Integer, nullable=True, index=True)
-
-    # Aggregated data
-    top_pain_points = Column(JSON)  # [{pain_point: str, count: int, tickets: [ids]}]
-    top_topics = Column(JSON)  # [{topic: str, count: int}]
-    sentiment_distribution = Column(JSON)  # {positive: int, negative: int, neutral: int}
-    average_urgency = Column(Float)
-    total_tickets_analyzed = Column(Integer)
-
-    # Metadata
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    __table_args__ = (
-        Index("idx_insights_period", "period_start", "period_end"),
-        Index("idx_insights_mailbox_period", "mailbox_id", "period_start", "period_end"),
-    )
-
-
 class SyncState(Base):
     """Track sync state for incremental updates."""
 

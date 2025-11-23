@@ -18,28 +18,15 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: helpscout-redis
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
   api:
     build: .
     container_name: helpscout-api
-    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
     env_file:
       - .env
     environment:
       - DATABASE_URL=postgresql://helpscout:helpscout@postgres:5432/helpscout_insights
-      - REDIS_URL=redis://redis:6379/0
     volumes:
       - .:/app
       - ./data:/app/data
@@ -47,26 +34,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  worker:
-    build: .
-    container_name: helpscout-worker
-    entrypoint: ["python", "-m", "src.workers.worker"]
-    env_file:
-      - .env
-    environment:
-      - DATABASE_URL=postgresql://helpscout:helpscout@postgres:5432/helpscout_insights
-      - REDIS_URL=redis://redis:6379/0
-    volumes:
-      - .:/app
-      - ./data:/app/data
-      - ./logs:/app/logs
-    depends_on:
-      api:
-        condition: service_started
     restart: unless-stopped
 
 volumes:

@@ -9,41 +9,16 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from src.database import get_db
-from src.models import Ticket, TicketAnalysis, AggregatedInsight, SyncState
-from src.analyzer.aggregator import InsightAggregator
+from src.models import Ticket, TicketAnalysis
 from src.analyzer.pipeline import AnalysisPipeline
-from src.analyzer.auto_categorizer import AutoCategorizer
 from src.analyzer.stats_analyzer import StatisticalAnalyzer
 from src.syncer.helpscout import HelpScoutSyncer
-from src.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 # Response models
-class PainPointResponse(BaseModel):
-    pain_point: str
-    count: int
-    percentage: float
-
-
-class TopicResponse(BaseModel):
-    topic: str
-    count: int
-    percentage: float
-
-
-class InsightsResponse(BaseModel):
-    period_start: datetime
-    period_end: datetime
-    total_tickets_analyzed: int
-    top_pain_points: List[PainPointResponse]
-    top_topics: List[TopicResponse]
-    sentiment_distribution: dict
-    average_urgency: float
-
-
 class TicketSummary(BaseModel):
     id: int
     helpscout_id: int
@@ -55,45 +30,8 @@ class TicketSummary(BaseModel):
     sentiment: Optional[str] = None
     urgency_score: Optional[float] = None
     pain_points: Optional[List[str]] = None
-
-
-class SyncStatusResponse(BaseModel):
-    mailbox_id: int
-    last_sync_at: datetime
-    total_tickets_synced: int
-
-
-@router.get("/insights", response_model=InsightsResponse)
-def get_insights(
-    days: int = Query(default=7, ge=1, le=90),
-    mailbox_id: Optional[int] = None,
-    db: Session = Depends(get_db),
-):
-    """Get aggregated insights for the specified period."""
-    aggregator = InsightAggregator(db)
-
-    # Try to get existing aggregated data
-    latest = aggregator.get_latest_insights(mailbox_id=mailbox_id)
-
-    # Check if we need fresh aggregation
-    if not latest or (datetime.utcnow() - latest.updated_at).total_seconds() > 3600:
-        # Aggregate fresh data
-        logger.info("Generating fresh insights")
-        aggregator.aggregate_insights(days=days, mailbox_id=mailbox_id)
-        latest = aggregator.get_latest_insights(mailbox_id=mailbox_id)
-
-    if not latest:
-        raise HTTPException(status_code=404, detail="No insights available")
-
-    return InsightsResponse(
-        period_start=latest.period_start,
-        period_end=latest.period_end,
-        total_tickets_analyzed=latest.total_tickets_analyzed,
-        top_pain_points=[PainPointResponse(**pp) for pp in latest.top_pain_points],
-        top_topics=[TopicResponse(**t) for t in latest.top_topics],
-        sentiment_distribution=latest.sentiment_distribution,
-        average_urgency=latest.average_urgency,
-    )
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
 
 
 @router.get("/tickets", response_model=List[TicketSummary])
@@ -131,6 +69,8 @@ def get_tickets(
             sentiment=analysis.sentiment if analysis else None,
             urgency_score=analysis.urgency_score if analysis else None,
             pain_points=analysis.pain_points if analysis else None,
+            category=analysis.category if analysis else None,
+            subcategory=analysis.subcategory if analysis else None,
         )
         for ticket, analysis in results
     ]
@@ -159,6 +99,8 @@ def get_ticket(ticket_id: int, db: Session = Depends(get_db)):
             "tags": ticket.tags,
         },
         "analysis": {
+            "category": analysis.category if analysis else None,
+            "subcategory": analysis.subcategory if analysis else None,
             "pain_points": analysis.pain_points if analysis else [],
             "topics": analysis.topics if analysis else [],
             "sentiment": analysis.sentiment if analysis else None,
@@ -206,43 +148,6 @@ def trigger_analysis(
 
     background_tasks.add_task(run_analysis)
     return {"message": "Analysis started", "limit": limit}
-
-
-@router.get("/sync-status", response_model=List[SyncStatusResponse])
-def get_sync_status(db: Session = Depends(get_db)):
-    """Get sync status for all mailboxes."""
-    sync_states = db.query(SyncState).all()
-
-    return [
-        SyncStatusResponse(
-            mailbox_id=state.mailbox_id,
-            last_sync_at=state.last_sync_at,
-            total_tickets_synced=state.total_tickets_synced,
-        )
-        for state in sync_states
-    ]
-
-
-@router.get("/categories")
-def get_auto_categories(
-    days: int = Query(default=30, ge=1, le=90),
-    db: Session = Depends(get_db),
-):
-    """Get automatically extracted categories and subcategories."""
-    if not settings.enable_auto_categorization:
-        return {
-            "enabled": False,
-            "message": "Auto-categorization is disabled. Enable with ENABLE_AUTO_CATEGORIZATION=true",
-        }
-
-    categorizer = AutoCategorizer(db)
-    summary = categorizer.get_category_summary(days=days)
-
-    return {
-        "enabled": True,
-        "days": days,
-        "categories": summary,
-    }
 
 
 @router.get("/categories/stats")

@@ -5,48 +5,32 @@ echo "🚀 HelpScout Ticket Insights - Starting up..."
 
 # Wait for PostgreSQL to be ready
 echo "⏳ Waiting for PostgreSQL..."
-while ! pg_isready -h postgres -U helpscout > /dev/null 2>&1; do
+until pg_isready -h postgres -U helpscout > /dev/null 2>&1; do
     sleep 1
 done
 echo "✓ PostgreSQL is ready"
 
-# Wait for Redis to be ready
-echo "⏳ Waiting for Redis..."
-while ! redis-cli -h redis ping > /dev/null 2>&1; do
-    sleep 1
-done
-echo "✓ Redis is ready"
-
-# Run database migrations
-echo "📦 Running database migrations..."
-alembic upgrade head
-echo "✓ Migrations complete"
+# Initialize database schema
+echo "📦 Initializing database..."
+python scripts/init_db.py
+echo "✓ Database initialized"
 
 # Check if this is first run (no tickets in database)
-echo "🔍 Checking if initial setup is needed..."
-python -c "
+if [ "${AUTO_INITIAL_SYNC:-true}" = "true" ]; then
+    echo "🔍 Checking if initial sync is needed..."
+    python -c "
 from src.database import SessionLocal
 from src.models import Ticket
 db = SessionLocal()
 ticket_count = db.query(Ticket).count()
 db.close()
-exit(0 if ticket_count == 0 else 1)
-" && IS_FIRST_RUN=true || IS_FIRST_RUN=false
-
-if [ "$IS_FIRST_RUN" = true ]; then
-    echo "🎯 First run detected - running initial setup..."
-
-    # Check if auto sync is enabled
-    if [ "${AUTO_INITIAL_SYNC:-true}" = "true" ]; then
-        echo "📥 Running initial sync..."
-        python scripts/auto_setup.py
-        echo "✓ Initial setup complete"
-    else
-        echo "⏭️  Auto initial sync disabled (AUTO_INITIAL_SYNC=false)"
-        echo "   Run manually: docker compose exec api python scripts/init_db.py"
-    fi
-else
-    echo "✓ Database already initialized (found existing tickets)"
+if ticket_count == 0:
+    print('🎯 First run detected - triggering initial sync...')
+    exit(0)
+else:
+    print('✓ Database already has tickets')
+    exit(1)
+" && python scripts/auto_setup.py || echo "⏭️  Skipping initial sync"
 fi
 
 echo "🌐 Starting API server..."

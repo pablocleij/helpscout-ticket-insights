@@ -14,7 +14,7 @@ engine = create_engine(
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
-    echo=settings.is_development,
+    echo=False,  # Set to True for SQL query logging
 )
 
 # Create session factory

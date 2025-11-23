@@ -24,7 +24,6 @@ from src.database import get_db_context, init_db
 from src.models import Ticket, Thread, TicketAnalysis
 from src.analyzer.pipeline import AnalysisPipeline
 from src.analyzer.stats_analyzer import StatisticalAnalyzer
-from src.analyzer.auto_categorizer import AutoCategorizer
 from src.config import settings
 
 logging.basicConfig(
@@ -264,26 +263,6 @@ def test_statistical_analysis(db):
     return stats
 
 
-def test_auto_categorizer(db):
-    """Test the auto-categorizer."""
-    logger.info("\n" + "=" * 60)
-    logger.info("TESTING AUTO-CATEGORIZER")
-    logger.info("=" * 60)
-
-    categorizer = AutoCategorizer(db)
-    summary = categorizer.get_category_summary(days=7)
-
-    logger.info("\n🏷️  AUTO-DETECTED CATEGORIES:")
-    for cat in summary.get("main_categories", [])[:5]:
-        logger.info(f"  • {cat['category']}: {cat['count']} tickets")
-
-    logger.info("\n🔖 FREQUENT TAGS:")
-    for tag in summary.get("top_tags", [])[:5]:
-        logger.info(f"  • {tag['tag']}: {tag['count']}")
-
-    return summary
-
-
 def test_category_breakdown(db):
     """Test detailed category breakdown."""
     logger.info("\n" + "=" * 60)
@@ -400,10 +379,7 @@ def main():
             # 3. Test statistical analysis
             stats = test_statistical_analysis(db)
 
-            # 4. Test auto-categorizer
-            auto_summary = test_auto_categorizer(db)
-
-            # 5. Test category breakdown
+            # 4. Test category breakdown
             breakdown = test_category_breakdown(db)
 
             # Summary
