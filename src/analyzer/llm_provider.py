@@ -26,7 +26,7 @@ class OpenAIProvider:
         """Analyze ticket using OpenAI with robust error handling."""
         context = context or {}
 
-        system_prompt = """You are an expert support ticket analyzer specializing in categorization and issue identification.
+        system_prompt = """You are an expert support ticket analyzer specializing in categorization, issue identification, and entity extraction.
 
 Analyze the ticket and provide:
 1. category: Primary category (e.g., "Billing", "Technical Issue", "Feature Request", "Account Access", "Integration", "Performance", "Data Management", "UI/UX")
@@ -36,7 +36,13 @@ Analyze the ticket and provide:
 5. sentiment: Overall sentiment (positive/neutral/negative)
 6. urgency_score: Urgency from 0.0 (low) to 1.0 (critical)
 7. suggested_tags: Relevant tags for quick filtering (max 5)
-8. summary: Brief 1-2 sentence summary of the issue
+8. summary: Comprehensive 2-4 sentence summary covering the entire conversation arc - initial issue, key developments, current status, and resolution (if closed)
+9. extracted_entities: Extract specific entities from the ticket:
+   - products: Product/feature names mentioned (e.g., "iOS app", "API v2", "Dashboard", "Stripe integration")
+   - error_codes: Error codes or technical identifiers (e.g., "500 error", "ERR_TIMEOUT", "404")
+   - complaint_keywords: Key complaint words (e.g., "broken", "slow", "not working", "crash", "bug")
+   - dates: Any dates or time references mentioned by customer (e.g., "since yesterday", "Nov 15", "last week")
+   - urls: Any URLs or domains mentioned (e.g., "example.com", "api.stripe.com")
 
 Return response as valid JSON matching this structure:
 {
@@ -47,7 +53,14 @@ Return response as valid JSON matching this structure:
     "sentiment": "string",
     "urgency_score": 0.0,
     "suggested_tags": ["string"],
-    "summary": "string"
+    "summary": "string",
+    "extracted_entities": {
+        "products": ["string"],
+        "error_codes": ["string"],
+        "complaint_keywords": ["string"],
+        "dates": ["string"],
+        "urls": ["string"]
+    }
 }"""
 
         user_prompt = f"Analyze this support ticket:\n\n{ticket_text}"
@@ -77,6 +90,21 @@ Return response as valid JSON matching this structure:
                 response = self.client.chat.completions.create(**api_params)
 
                 result = json.loads(response.choices[0].message.content)
+
+                # Ensure extracted_entities has proper structure with defaults
+                extracted_entities = result.get("extracted_entities", {})
+                if not isinstance(extracted_entities, dict):
+                    extracted_entities = {}
+
+                # Ensure all entity fields exist with defaults
+                extracted_entities = {
+                    "products": extracted_entities.get("products", []),
+                    "error_codes": extracted_entities.get("error_codes", []),
+                    "complaint_keywords": extracted_entities.get("complaint_keywords", []),
+                    "dates": extracted_entities.get("dates", []),
+                    "urls": extracted_entities.get("urls", []),
+                }
+
                 return {
                     "category": result.get("category", "Uncategorized"),
                     "subcategory": result.get("subcategory", "General"),
@@ -86,6 +114,7 @@ Return response as valid JSON matching this structure:
                     "urgency_score": float(result.get("urgency_score", 0.5)),
                     "suggested_tags": result.get("suggested_tags", []),
                     "summary": result.get("summary", ""),
+                    "extracted_entities": extracted_entities,
                     "raw_response": result,
                 }
 

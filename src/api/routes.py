@@ -130,6 +130,7 @@ def get_ticket(ticket_id: int, db: Session = Depends(get_db)):
             "urgency_score": analysis.urgency_score if analysis else None,
             "suggested_tags": analysis.suggested_tags if analysis else [],
             "summary": analysis.summary if analysis else None,
+            "extracted_entities": analysis.extracted_entities if analysis else {},
             "analyzed_at": analysis.analyzed_at if analysis else None,
         }
         if analysis
@@ -204,3 +205,202 @@ def get_category_breakdown(
         raise HTTPException(status_code=404, detail=f"No tickets found in category '{category}'")
 
     return breakdown
+
+
+@router.get("/entities/products")
+def get_product_insights(
+    days: int = Query(default=30, ge=1, le=365),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Get insights about mentioned products and their associated issues."""
+    from sqlalchemy import func, cast, String
+    from collections import Counter
+
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+    # Get all analyses with extracted entities
+    analyses = (
+        db.query(TicketAnalysis, Ticket)
+        .join(Ticket)
+        .filter(Ticket.created_at >= cutoff_date)
+        .filter(TicketAnalysis.extracted_entities.isnot(None))
+        .all()
+    )
+
+    product_stats = {}
+    for analysis, ticket in analyses:
+        entities = analysis.extracted_entities or {}
+        products = entities.get("products", [])
+
+        for product in products:
+            if product not in product_stats:
+                product_stats[product] = {
+                    "product": product,
+                    "count": 0,
+                    "categories": Counter(),
+                    "sentiments": Counter(),
+                    "avg_urgency": [],
+                    "error_codes": Counter(),
+                }
+
+            product_stats[product]["count"] += 1
+            product_stats[product]["categories"][analysis.category] += 1
+            product_stats[product]["sentiments"][analysis.sentiment] += 1
+            product_stats[product]["avg_urgency"].append(analysis.urgency_score or 0.5)
+
+            # Track error codes associated with this product
+            error_codes = entities.get("error_codes", [])
+            for error in error_codes:
+                product_stats[product]["error_codes"][error] += 1
+
+    # Format results
+    results = []
+    for product, stats in product_stats.items():
+        results.append({
+            "product": product,
+            "ticket_count": stats["count"],
+            "avg_urgency": sum(stats["avg_urgency"]) / len(stats["avg_urgency"]) if stats["avg_urgency"] else 0,
+            "top_categories": dict(stats["categories"].most_common(3)),
+            "sentiment_distribution": dict(stats["sentiments"]),
+            "common_errors": dict(stats["error_codes"].most_common(5)),
+        })
+
+    # Sort by ticket count
+    results.sort(key=lambda x: x["ticket_count"], reverse=True)
+
+    return {
+        "period_days": days,
+        "total_products": len(results),
+        "products": results[:limit],
+    }
+
+
+@router.get("/entities/errors")
+def get_error_insights(
+    days: int = Query(default=30, ge=1, le=365),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Get insights about error codes and their patterns."""
+    from collections import Counter
+
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+    analyses = (
+        db.query(TicketAnalysis, Ticket)
+        .join(Ticket)
+        .filter(Ticket.created_at >= cutoff_date)
+        .filter(TicketAnalysis.extracted_entities.isnot(None))
+        .all()
+    )
+
+    error_stats = {}
+    for analysis, ticket in analyses:
+        entities = analysis.extracted_entities or {}
+        errors = entities.get("error_codes", [])
+
+        for error in errors:
+            if error not in error_stats:
+                error_stats[error] = {
+                    "error_code": error,
+                    "count": 0,
+                    "categories": Counter(),
+                    "products": Counter(),
+                    "avg_urgency": [],
+                }
+
+            error_stats[error]["count"] += 1
+            error_stats[error]["categories"][analysis.category] += 1
+            error_stats[error]["avg_urgency"].append(analysis.urgency_score or 0.5)
+
+            # Track products associated with this error
+            products = entities.get("products", [])
+            for product in products:
+                error_stats[error]["products"][product] += 1
+
+    results = []
+    for error, stats in error_stats.items():
+        results.append({
+            "error_code": error,
+            "ticket_count": stats["count"],
+            "avg_urgency": sum(stats["avg_urgency"]) / len(stats["avg_urgency"]) if stats["avg_urgency"] else 0,
+            "top_categories": dict(stats["categories"].most_common(3)),
+            "affected_products": dict(stats["products"].most_common(5)),
+        })
+
+    results.sort(key=lambda x: x["ticket_count"], reverse=True)
+
+    return {
+        "period_days": days,
+        "total_error_types": len(results),
+        "errors": results[:limit],
+    }
+
+
+@router.get("/search/tickets")
+def search_tickets_by_entity(
+    product: Optional[str] = Query(default=None),
+    error_code: Optional[str] = Query(default=None),
+    complaint_keyword: Optional[str] = Query(default=None),
+    days: int = Query(default=30, ge=1, le=365),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    """Search tickets by extracted entities (products, errors, keywords)."""
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+    query = (
+        db.query(Ticket, TicketAnalysis)
+        .join(TicketAnalysis)
+        .filter(Ticket.created_at >= cutoff_date)
+        .filter(TicketAnalysis.extracted_entities.isnot(None))
+    )
+
+    results = query.all()
+    filtered_tickets = []
+
+    for ticket, analysis in results:
+        entities = analysis.extracted_entities or {}
+        match = True
+
+        if product:
+            products = entities.get("products", [])
+            if not any(product.lower() in p.lower() for p in products):
+                match = False
+
+        if error_code:
+            errors = entities.get("error_codes", [])
+            if not any(error_code.lower() in e.lower() for e in errors):
+                match = False
+
+        if complaint_keyword:
+            keywords = entities.get("complaint_keywords", [])
+            if not any(complaint_keyword.lower() in k.lower() for k in keywords):
+                match = False
+
+        if match:
+            filtered_tickets.append({
+                "id": ticket.id,
+                "helpscout_id": ticket.helpscout_id,
+                "number": ticket.number,
+                "subject": ticket.subject,
+                "status": ticket.status,
+                "created_at": ticket.created_at,
+                "category": analysis.category,
+                "sentiment": analysis.sentiment,
+                "urgency_score": analysis.urgency_score,
+                "summary": analysis.summary,
+                "extracted_entities": entities,
+            })
+
+    return {
+        "filters": {
+            "product": product,
+            "error_code": error_code,
+            "complaint_keyword": complaint_keyword,
+            "days": days,
+        },
+        "total_matches": len(filtered_tickets),
+        "tickets": filtered_tickets[:limit],
+    }

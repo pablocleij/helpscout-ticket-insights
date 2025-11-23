@@ -92,6 +92,7 @@ class TicketAnalysis(Base):
     urgency_score = Column(Float)  # 0-1 scale
     suggested_tags = Column(JSON)  # List of suggested tags
     summary = Column(Text)  # Brief summary of the issue
+    extracted_entities = Column(JSON)  # Extracted entities (products, errors, URLs, etc.)
 
     # Metadata
     analyzed_at = Column(DateTime, nullable=False, default=datetime.utcnow)

@@ -49,8 +49,9 @@ class AnalysisPipeline:
             analysis.urgency_score = analysis_result["urgency_score"]
             analysis.suggested_tags = analysis_result["suggested_tags"]
             analysis.summary = analysis_result["summary"]
+            analysis.extracted_entities = analysis_result.get("extracted_entities", {})
             analysis.analyzed_at = datetime.utcnow()
-            analysis.llm_provider = settings.llm_provider
+            analysis.llm_provider = "openai"
             analysis.llm_model = settings.openai_model
             analysis.raw_response = analysis_result.get("raw_response")
         else:
@@ -65,8 +66,9 @@ class AnalysisPipeline:
                 urgency_score=analysis_result["urgency_score"],
                 suggested_tags=analysis_result["suggested_tags"],
                 summary=analysis_result["summary"],
+                extracted_entities=analysis_result.get("extracted_entities", {}),
                 analyzed_at=datetime.utcnow(),
-                llm_provider=settings.llm_provider,
+                llm_provider="openai",
                 llm_model=settings.openai_model,
                 raw_response=analysis_result.get("raw_response"),
             )

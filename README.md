@@ -20,7 +20,11 @@ Everything else has been removed to keep it **simple, fast, and reliable**.
 - 🛡️ **Failure-proof** - comprehensive error handling with actionable messages
 - 🔍 **Preflight validation** - checks all prerequisites before startup
 - 🤖 **Smart categorization** - GPT-5.1 with adaptive reasoning for category, subcategory, pain points, sentiment
-- 📊 **Statistical insights** - distribution, trending, cross-analysis on LLM data
+- 🧬 **Entity extraction** - auto-extract products, error codes, complaint keywords, dates, URLs from tickets
+- 📝 **Thread summarization** - comprehensive summaries covering entire conversation arcs
+- 🔎 **Entity search** - find tickets by product, error code, or keyword
+- 📊 **Product insights** - identify which products generate most issues and common error patterns
+- 📈 **Statistical analysis** - distribution, trending, cross-analysis on LLM data
 - 🔄 **Fault-tolerant sync** - duplicate detection, batch commits, auto-retry
 - 🏥 **Health checks** - monitoring endpoint for production deployments
 - 🐳 **Docker-first** - single command deployment with PostgreSQL
@@ -85,6 +89,8 @@ You'll see preflight checks, sync progress, and LLM categorization in real-time.
 
 ## 📋 API Endpoints
 
+### Core Endpoints
+
 ```bash
 # Health check
 GET /api/health
@@ -92,7 +98,7 @@ GET /api/health
 # List recent tickets with analysis
 GET /api/tickets?days=7&limit=50
 
-# Get single ticket details
+# Get single ticket details (includes extracted entities)
 GET /api/tickets/{ticket_id}
 
 # Get statistical analysis of categories
@@ -106,6 +112,54 @@ POST /api/sync
 
 # Trigger manual analysis
 POST /api/analyze
+```
+
+### 🆕 Entity Extraction Endpoints
+
+```bash
+# Get product insights (which products have most issues)
+GET /api/entities/products?days=30&limit=20
+# Returns: product mention counts, associated categories, error patterns, sentiment
+
+# Get error code insights (trending errors)
+GET /api/entities/errors?days=30&limit=20
+# Returns: error code frequency, affected products, urgency scores
+
+# Search tickets by entity
+GET /api/search/tickets?product=iOS+app&days=30
+GET /api/search/tickets?error_code=500&days=30
+GET /api/search/tickets?complaint_keyword=slow&days=30
+# Combine filters: ?product=API&error_code=timeout&days=7
+```
+
+### Example: Product Insights Response
+
+```json
+{
+  "period_days": 30,
+  "total_products": 12,
+  "products": [
+    {
+      "product": "iOS app",
+      "ticket_count": 45,
+      "avg_urgency": 0.72,
+      "top_categories": {
+        "Technical Issue": 30,
+        "Performance": 10,
+        "Bug": 5
+      },
+      "sentiment_distribution": {
+        "negative": 35,
+        "neutral": 8,
+        "positive": 2
+      },
+      "common_errors": {
+        "crash on startup": 12,
+        "slow loading": 8
+      }
+    }
+  ]
+}
 ```
 
 Full interactive docs: http://localhost:8000/docs
@@ -328,10 +382,29 @@ ANALYSIS_BATCH_SIZE=50
 - `pain_points` (JSON), `topics` (JSON)
 - `sentiment`, `urgency_score`
 - `suggested_tags` (JSON), `summary`
+- 🆕 `extracted_entities` (JSON) - products, error_codes, complaint_keywords, dates, urls
 - `analyzed_at`, `llm_provider`, `llm_model`
 
 **sync_states** - Track sync progress per mailbox
 - `mailbox_id`, `last_sync_at`, `total_tickets_synced`
+
+### Entity Extraction Details
+
+The LLM automatically extracts the following entities from ticket conversations:
+
+| Entity Type | Description | Examples |
+|------------|-------------|----------|
+| **products** | Product or feature names mentioned | "iOS app", "API v2", "Dashboard", "Stripe integration" |
+| **error_codes** | Error codes or technical identifiers | "500 error", "ERR_TIMEOUT", "404", "Connection refused" |
+| **complaint_keywords** | Key complaint indicators | "broken", "slow", "not working", "crash", "bug", "stuck" |
+| **dates** | Time references from customer | "since yesterday", "Nov 15", "last week", "3 days ago" |
+| **urls** | URLs or domains mentioned | "example.com", "api.stripe.com", "dashboard.app.com" |
+
+**Use cases:**
+- **Product managers**: Identify which products/features generate most support issues
+- **Engineering teams**: Track error patterns and affected products
+- **Support teams**: Find similar tickets by error code or product
+- **Leadership**: Spot trending issues early (e.g., spike in "iOS app" + "crash" mentions)
 
 ## 🛠️ Development
 
@@ -348,6 +421,9 @@ export OPENAI_API_KEY="your_key"
 
 # Initialize database
 python scripts/init_db.py
+
+# Run migration for entity extraction (if upgrading from older version)
+python scripts/add_extracted_entities_column.py
 
 # Run API server
 uvicorn src.api.main:app --reload --port 8000
