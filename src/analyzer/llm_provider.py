@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class OpenAIProvider:
     """OpenAI GPT-based provider."""
 
-    def __init__(self, api_key: str, model: str = "gpt-5.1"):
+    def __init__(self, api_key: str, model: str = "gpt-5.1", reasoning_effort: str = "medium"):
         try:
             from openai import OpenAI
         except ImportError:
@@ -20,6 +20,7 @@ class OpenAIProvider:
 
         self.client = OpenAI(api_key=api_key)
         self.model = model
+        self.reasoning_effort = reasoning_effort
 
     def analyze_ticket(self, ticket_text: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Analyze ticket using OpenAI with robust error handling."""
@@ -57,16 +58,23 @@ Return response as valid JSON matching this structure:
 
         for attempt in range(max_retries):
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
+                # Build API parameters
+                api_params = {
+                    "model": self.model,
+                    "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    temperature=0.3,
-                    response_format={"type": "json_object"},
-                    timeout=60,
-                )
+                    "temperature": 0.3,
+                    "response_format": {"type": "json_object"},
+                    "timeout": 60,
+                }
+
+                # Add reasoning_effort for GPT-5.1 models
+                if "gpt-5" in self.model.lower():
+                    api_params["reasoning_effort"] = self.reasoning_effort
+
+                response = self.client.chat.completions.create(**api_params)
 
                 result = json.loads(response.choices[0].message.content)
                 return {
@@ -168,7 +176,7 @@ Return response as valid JSON matching this structure:
                         f"OpenAI model '{self.model}' not found.\n"
                         "💡 Action required:\n"
                         "   1. Verify OPENAI_MODEL in .env is correct\n"
-                        "   2. Use a supported model: gpt-5.1 (recommended), gpt-5.1-instant\n"
+                        "   2. Use a supported model: gpt-5.1 (recommended), gpt-5.1-chat-latest\n"
                         "   3. Check available models at: https://platform.openai.com/docs/models\n"
                         f"   Current model: {self.model}"
                     )
@@ -215,4 +223,8 @@ def get_llm_provider() -> OpenAIProvider:
     """Get configured OpenAI provider."""
     if not settings.openai_api_key:
         raise ValueError("OPENAI_API_KEY not configured")
-    return OpenAIProvider(api_key=settings.openai_api_key, model=settings.openai_model)
+    return OpenAIProvider(
+        api_key=settings.openai_api_key,
+        model=settings.openai_model,
+        reasoning_effort=settings.openai_reasoning_effort
+    )

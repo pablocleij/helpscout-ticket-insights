@@ -17,7 +17,8 @@ class Settings(BaseSettings):
 
     # OpenAI Configuration
     openai_api_key: Optional[str] = None
-    openai_model: str = "gpt-5.1"  # Latest model (gpt-5.1, gpt-5.1-instant)
+    openai_model: str = "gpt-5.1"  # Latest model (gpt-5.1, gpt-5.1-chat-latest)
+    openai_reasoning_effort: str = "medium"  # Reasoning effort: none, low, medium, high
 
     # Application Settings
     log_level: str = "INFO"

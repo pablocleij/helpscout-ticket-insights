@@ -271,7 +271,8 @@ This creates 10 mock tickets, runs analysis, and verifies:
 | `HELPSCOUT_API_KEY` | ✅ Yes | - | HelpScout API key |
 | `OPENAI_API_KEY` | ✅ Yes | - | OpenAI API key (must start with `sk-`) |
 | `DATABASE_URL` | No | `postgresql://...` | PostgreSQL connection string |
-| `OPENAI_MODEL` | No | `gpt-5.1` | OpenAI model to use (gpt-5.1 or gpt-5.1-instant) |
+| `OPENAI_MODEL` | No | `gpt-5.1` | OpenAI model to use (gpt-5.1 or gpt-5.1-chat-latest) |
+| `OPENAI_REASONING_EFFORT` | No | `medium` | Reasoning effort: none, low, medium, high |
 | `LOG_LEVEL` | No | `INFO` | Logging level |
 | **Sync Configuration** ||||
 | `SYNC_START_DATE` | No | - | Only sync tickets from this date (ISO: `2024-01-01`) |
@@ -289,8 +290,9 @@ This creates 10 mock tickets, runs analysis, and verifies:
 SYNC_START_DATE=2024-11-01
 MAX_TICKETS_PER_SYNC=100
 
-# Use faster instant model
-OPENAI_MODEL=gpt-5.1-instant
+# Use faster chat model with no reasoning
+OPENAI_MODEL=gpt-5.1-chat-latest
+OPENAI_REASONING_EFFORT=none
 ```
 
 **For production with comprehensive analysis:**
@@ -300,8 +302,9 @@ OPENAI_MODEL=gpt-5.1-instant
 SYNC_START_DATE=
 MAX_TICKETS_PER_SYNC=0  # unlimited
 
-# Use best model (adaptive reasoning)
+# Use best model with adaptive reasoning
 OPENAI_MODEL=gpt-5.1
+OPENAI_REASONING_EFFORT=medium  # or 'high' for complex tickets
 ANALYSIS_BATCH_SIZE=50
 ```
 
